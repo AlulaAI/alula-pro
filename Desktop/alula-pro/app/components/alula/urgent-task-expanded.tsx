@@ -17,6 +17,7 @@ import {
   User,
   Calendar,
   Sparkles,
+  UserCircle,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useMutation } from "convex/react";
@@ -216,13 +217,43 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
               <h3 className="font-medium text-sm text-[#10292E]">Original Message</h3>
             </div>
             {action.communication ? (
-              <div className="bg-white p-3 rounded-lg border">
+              <div className="bg-white p-3 rounded-lg border space-y-2">
+                {/* Sender and Client Info */}
+                <div className="flex items-start justify-between text-xs">
+                  <div className="space-y-1">
+                    {action.communication.metadata?.from && (
+                      <div className="flex items-center gap-2">
+                        <UserCircle className="h-3 w-3 text-[#737373]" />
+                        <span className="text-[#737373]">From:</span>
+                        <span className="text-[#10292E] font-medium">{action.communication.metadata.from}</span>
+                      </div>
+                    )}
+                    {action.client && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3 text-[#737373]" />
+                        <span className="text-[#737373]">Client:</span>
+                        <span className="text-[#10292E] font-medium">{action.client.name}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[#737373]">
+                    {formatDistanceToNow(new Date(action.communication.createdAt), { addSuffix: true })}
+                  </div>
+                </div>
+                
+                {/* Subject Line */}
                 {action.communication.subject && (
-                  <p className="font-medium mb-1 text-sm">{action.communication.subject}</p>
+                  <div className="border-b pb-2">
+                    <p className="font-semibold text-sm text-[#10292E]">{action.communication.subject}</p>
+                  </div>
                 )}
-                <p className="text-xs text-[#737373] whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {action.communication.content}
-                </p>
+                
+                {/* Message Content */}
+                <div className="pt-1">
+                  <p className="text-xs text-[#737373] whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
+                    {action.communication.content}
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="bg-white p-3 rounded-lg border">

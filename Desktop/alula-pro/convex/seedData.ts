@@ -73,6 +73,10 @@ export const seedTestData = mutation({
       content: "The family called to express concerns about Margaret's new medication. She seems more confused than usual and has been experiencing dizziness. They want to know if this is a normal side effect or if they should contact her doctor immediately.",
       urgencyScore: 85,
       aiSummary: "Family reports increased confusion and dizziness after new medication - urgent medical consultation may be needed",
+      metadata: {
+        phoneNumber: "(555) 123-4567",
+        from: "Margaret's daughter Sarah",
+      },
       status: "active",
       createdAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
     });
@@ -86,6 +90,12 @@ export const seedTestData = mutation({
       content: "Thank you for the updated care plan. We've implemented the suggested daily routine and Margaret seems to be responding well. Can we schedule a follow-up call next week to discuss progress?",
       urgencyScore: 40,
       aiSummary: "Positive update on care plan implementation - routine follow-up requested",
+      metadata: {
+        from: "sarah.johnson@example.com",
+        to: "consultant@alulacare.com",
+        messageId: "msg-12345",
+        threadId: "thread-12345",
+      },
       status: "active",
       createdAt: Date.now() - 24 * 60 * 60 * 1000, // 1 day ago
     });
@@ -99,6 +109,9 @@ export const seedTestData = mutation({
       content: "Visited Robert at home. He appears to be managing well with current support. Noted some clutter accumulation in living areas. Discussed meal prep services and he's interested in trying them.",
       urgencyScore: 30,
       aiSummary: "Routine visit - client stable, interested in meal prep services",
+      metadata: {
+        from: "Consultant Name",
+      },
       status: "active",
       createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000, // 3 days ago
     });

@@ -38,6 +38,13 @@ export default defineSchema({
     content: v.string(),
     urgencyScore: v.optional(v.number()),
     aiSummary: v.optional(v.string()),
+    metadata: v.optional(v.object({
+      from: v.optional(v.string()),
+      to: v.optional(v.string()),
+      messageId: v.optional(v.string()),
+      threadId: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
+    })),
     status: v.union(
       v.literal("active"),
       v.literal("archived"),
