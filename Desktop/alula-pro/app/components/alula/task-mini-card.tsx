@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 interface TaskMiniCardProps {
   action: {
     _id: string;
+    type: "client" | "business" | "lead" | "partner";
     title: string;
     urgencyLevel: "critical" | "high" | "medium" | "low";
     createdAt: number;
@@ -42,6 +43,18 @@ export function TaskMiniCard({ action, onClick, isSelected }: TaskMiniCardProps)
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 mb-0.5">
+            {/* Type indicator */}
+            {action.type === "lead" && (
+              <span className="text-[9px] font-semibold text-green-700 uppercase">NEW</span>
+            )}
+            {action.type === "client" && (
+              <span className="text-[9px] font-semibold text-blue-700 uppercase">EXISTING</span>
+            )}
+            {action.type === "business" && (
+              <span className="text-[9px] font-semibold text-purple-700 uppercase">BUSINESS</span>
+            )}
+          </div>
           <h4 className="font-medium text-xs text-[#10292E] truncate">
             {action.title}
           </h4>

@@ -4,12 +4,13 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { ActionCard } from "~/components/alula/action-card";
 import { UrgentTaskExpanded } from "~/components/alula/urgent-task-expanded";
+import { UrgentTaskRedesigned } from "~/components/alula/urgent-task-redesigned";
 import { TaskMiniCard } from "~/components/alula/task-mini-card";
 import { ClientModal } from "~/components/alula/client-modal";
 import { CommunicationModal } from "~/components/alula/communication-modal";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Plus, Users, MessageCircle, Database, Bug, AlertTriangle, Mail } from "lucide-react";
+import { Plus, Users, MessageCircle, Database, Bug, AlertTriangle, Mail, Sparkles } from "lucide-react";
 import { EmptyState } from "~/components/alula/empty-state";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ export default function AlulaDashboard() {
   const [showCommunicationModal, setShowCommunicationModal] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  const [useRedesign, setUseRedesign] = useState(false);
 
   const actions = useQuery(api.actions.listActive) || [];
   const clients = useQuery(api.clients.list) || [];
@@ -105,8 +107,27 @@ export default function AlulaDashboard() {
                 <Mail className="h-3 w-3" />
               </Button>
             </a>
+            {/* Design toggle button - appears on hover in top-right corner */}
+            <Button
+              onClick={() => setUseRedesign(!useRedesign)}
+              variant="ghost"
+              size="icon"
+              className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 hover:opacity-100 transition-opacity"
+              title={useRedesign ? "Use Original Design" : "Try New Design"}
+            >
+              <Sparkles className="h-3 w-3" />
+            </Button>
           </div>
           <div className="flex gap-2">
+            <Button
+              onClick={() => setUseRedesign(!useRedesign)}
+              variant={useRedesign ? "default" : "outline"}
+              size="sm"
+              className={useRedesign ? "bg-purple-600 hover:bg-purple-700" : ""}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {useRedesign ? "New Design ✨" : "Try New Design"}
+            </Button>
             <Button
               onClick={() => setShowClientModal(true)}
               className="bg-[#10292E] hover:bg-[#10292E]/90"
@@ -174,11 +195,19 @@ export default function AlulaDashboard() {
             {/* Selected Task - Takes up 2 columns on large screens */}
             <div className="lg:col-span-2">
               {actionToDisplay && (
-                <UrgentTaskExpanded
-                  action={actionToDisplay}
-                  onArchive={() => handleArchive(displayedActionId!)}
-                  onSnooze={(hours) => handleSnooze(displayedActionId!, hours)}
-                />
+                useRedesign ? (
+                  <UrgentTaskRedesigned
+                    action={actionToDisplay}
+                    onArchive={() => handleArchive(displayedActionId!)}
+                    onSnooze={(hours) => handleSnooze(displayedActionId!, hours)}
+                  />
+                ) : (
+                  <UrgentTaskExpanded
+                    action={actionToDisplay}
+                    onArchive={() => handleArchive(displayedActionId!)}
+                    onSnooze={(hours) => handleSnooze(displayedActionId!, hours)}
+                  />
+                )
               )}
             </div>
 

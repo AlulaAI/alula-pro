@@ -273,9 +273,27 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                     <h2 className="text-sm font-medium text-[#10292E]">{action.title}</h2>
                   </div>
                 </div>
-                <Badge className={`${urgencyColors[action.urgencyLevel]} ml-2 text-xs px-2 py-0.5`}>
-                  {action.urgencyLevel}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {/* Type Badge */}
+                  {action.type === "lead" && (
+                    <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5">
+                      NEW
+                    </Badge>
+                  )}
+                  {action.type === "client" && (
+                    <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5">
+                      EXISTING
+                    </Badge>
+                  )}
+                  {action.type === "business" && (
+                    <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5">
+                      BUSINESS
+                    </Badge>
+                  )}
+                  <Badge className={`${urgencyColors[action.urgencyLevel]} ml-2 text-xs px-2 py-0.5`}>
+                    {action.urgencyLevel}
+                  </Badge>
+                </div>
               </div>
               
               <div className="flex items-center gap-3 text-[10px] text-[#737373] mt-1">

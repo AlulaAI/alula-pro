@@ -55,21 +55,40 @@ export const listActive = query({
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
-    // Sort by urgency and date
-    const sortedActions = actions.sort((a, b) => {
-      // Urgency priority
-      const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-      const urgencyDiff = urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
-      if (urgencyDiff !== 0) return urgencyDiff;
+    // Calculate priority score for each action
+    const typeWeights = {
+      client: 3,    // Existing client
+      lead: 2,      // New client
+      business: 1,  // Business need
+      partner: 1,   // Partner (same as business)
+    };
 
-      // Then by due date
+    const urgencyValues = {
+      critical: 100,
+      high: 75,
+      medium: 50,
+      low: 25,
+    };
+
+    // Sort by combined priority score
+    const sortedActions = actions.sort((a, b) => {
+      // Calculate priority scores
+      const scoreA = (typeWeights[a.type] || 1) * (urgencyValues[a.urgencyLevel] || 0);
+      const scoreB = (typeWeights[b.type] || 1) * (urgencyValues[b.urgencyLevel] || 0);
+
+      // Sort by score (highest first)
+      if (scoreA !== scoreB) {
+        return scoreB - scoreA;
+      }
+
+      // If same score, sort by due date
       if (a.dueDate && b.dueDate) {
         return a.dueDate - b.dueDate;
       }
       if (a.dueDate) return -1;
       if (b.dueDate) return 1;
 
-      // Finally by creation date
+      // Finally by creation date (newest first)
       return b.createdAt - a.createdAt;
     });
 

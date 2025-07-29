@@ -87,3 +87,54 @@ export const update = mutation({
     return args.clientId;
   },
 });
+
+export const deleteClient = mutation({
+  args: {
+    clientId: v.id("clients"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Unauthorized");
+
+    const client = await ctx.db.get(args.clientId);
+    if (!client || client.consultantId !== user._id) {
+      throw new Error("Client not found");
+    }
+
+    // Delete all related data
+    // 1. Delete all communications
+    const communications = await ctx.db
+      .query("communications")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+    
+    for (const comm of communications) {
+      await ctx.db.delete(comm._id);
+    }
+
+    // 2. Delete all actions
+    const actions = await ctx.db
+      .query("actions")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+    
+    for (const action of actions) {
+      await ctx.db.delete(action._id);
+    }
+
+    // 3. Delete all time entries
+    const timeEntries = await ctx.db
+      .query("timeEntries")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+    
+    for (const entry of timeEntries) {
+      await ctx.db.delete(entry._id);
+    }
+
+    // Finally, delete the client
+    await ctx.db.delete(args.clientId);
+
+    return { success: true };
+  },
+});
