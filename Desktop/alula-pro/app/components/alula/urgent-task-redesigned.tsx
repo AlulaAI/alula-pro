@@ -374,19 +374,52 @@ export function UrgentTaskRedesigned({ action, onArchive, onSnooze }: UrgentTask
       {showReply && (
         <div className="border-t animate-in slide-in-from-top-2">
           <div className="grid grid-cols-2 divide-x">
-            {/* Original Email */}
+            {/* Original Email & History */}
             <div className="p-4 bg-gray-50">
               <div className="flex items-center gap-2 mb-3">
                 <Mail className="h-4 w-4 text-gray-500" />
-                <h3 className="text-sm font-medium text-gray-700">Original Message from {senderName}</h3>
+                <h3 className="text-sm font-medium text-gray-700">Current & Previous Messages</h3>
               </div>
-              {action.communication && (
-                <div className="bg-white p-3 rounded-lg border max-h-[300px] overflow-y-auto">
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                    {action.communication.content}
-                  </p>
-                </div>
-              )}
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {/* Current Email */}
+                {action.communication && (
+                  <div className="bg-white p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-gray-700">Current Message</p>
+                      <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0">
+                        Replying to
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                      {action.communication.content}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Previous Communications */}
+                {action.communicationHistory && action.communicationHistory.length > 1 && (
+                  <>
+                    <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                      Previous Messages ({action.communicationHistory.length - 1})
+                    </div>
+                    {action.communicationHistory.slice(1).map((comm) => (
+                      <div key={comm._id} className="bg-white p-2.5 rounded border">
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="text-xs font-medium text-gray-700 truncate">
+                            {comm.subject || "No subject"}
+                          </p>
+                          <p className="text-[10px] text-gray-500 ml-2">
+                            {formatDistanceToNow(new Date(comm.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-600 line-clamp-3">
+                          {comm.content}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Reply Interface */}
@@ -507,18 +540,36 @@ export function UrgentTaskRedesigned({ action, onArchive, onSnooze }: UrgentTask
       {/* DETAILED VIEW - Progressive Disclosure */}
       {showDetails && (
         <div className="px-4 py-3 bg-gray-50 border-t space-y-3 animate-in slide-in-from-top-2">
-          {/* Communication History */}
+          {/* Communication History - Scrollable */}
           {action.communicationHistory && action.communicationHistory.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-700 mb-2">Previous Communications</p>
-              <div className="space-y-2">
-                {action.communicationHistory.slice(0, 3).map((comm, idx) => (
-                  <div key={comm._id} className="bg-white p-2 rounded border text-xs">
-                    <div className="flex justify-between text-gray-500 mb-1">
-                      <span>{comm.subject || "No subject"}</span>
-                      <span>{formatDistanceToNow(new Date(comm.createdAt), { addSuffix: true })}</span>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-gray-700">
+                  Communication History ({action.communicationHistory.length})
+                </p>
+                <span className="text-[10px] text-gray-500">Most recent first</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                {action.communicationHistory.map((comm, idx) => (
+                  <div key={comm._id} className="bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs text-gray-900 truncate">
+                          {comm.subject || "No subject"}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {formatDistanceToNow(new Date(comm.createdAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                      {idx === 0 && (
+                        <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0 ml-2">
+                          Latest
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-gray-600 line-clamp-2">{comm.content}</p>
+                    <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+                      {comm.content}
+                    </p>
                   </div>
                 ))}
               </div>

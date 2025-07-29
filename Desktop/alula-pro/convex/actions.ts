@@ -224,7 +224,7 @@ export const getActionWithDetails = query({
         .query("communications")
         .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
         .order("desc")
-        .take(10);
+        .take(20);
     }
 
     // Generate key context for the client
