@@ -55,33 +55,34 @@ export const listActive = query({
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
-    // Calculate priority score for each action
-    const typeWeights = {
-      client: 3,    // Existing client
-      lead: 2,      // New client
-      business: 1,  // Business need
-      partner: 1,   // Partner (same as business)
-    };
 
-    const urgencyValues = {
-      critical: 100,
-      high: 75,
-      medium: 50,
-      low: 25,
-    };
-
-    // Sort by combined priority score
+    // Sort by priority hierarchy: urgency level first, then type
     const sortedActions = actions.sort((a, b) => {
-      // Calculate priority scores
-      const scoreA = (typeWeights[a.type] || 1) * (urgencyValues[a.urgencyLevel] || 0);
-      const scoreB = (typeWeights[b.type] || 1) * (urgencyValues[b.urgencyLevel] || 0);
-
-      // Sort by score (highest first)
-      if (scoreA !== scoreB) {
-        return scoreB - scoreA;
+      // First, compare urgency levels
+      const urgencyOrder = ['critical', 'high', 'medium', 'low'];
+      const urgencyIndexA = urgencyOrder.indexOf(a.urgencyLevel);
+      const urgencyIndexB = urgencyOrder.indexOf(b.urgencyLevel);
+      
+      if (urgencyIndexA !== urgencyIndexB) {
+        return urgencyIndexA - urgencyIndexB; // Lower index = higher priority
+      }
+      
+      // If same urgency level, compare client types
+      const typeOrder = {
+        'client': 1,    // Existing client - highest
+        'lead': 2,      // New client - middle
+        'business': 3,  // Business need - lowest
+        'partner': 3,   // Partner same as business
+      };
+      
+      const typeOrderA = typeOrder[a.type] || 999;
+      const typeOrderB = typeOrder[b.type] || 999;
+      
+      if (typeOrderA !== typeOrderB) {
+        return typeOrderA - typeOrderB; // Lower number = higher priority
       }
 
-      // If same score, sort by due date
+      // If same urgency and type, sort by due date
       if (a.dueDate && b.dueDate) {
         return a.dueDate - b.dueDate;
       }
