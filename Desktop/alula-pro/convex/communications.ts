@@ -171,3 +171,37 @@ export const createInternalNote = mutation({
     return noteId;
   },
 });
+
+export const updateWithAI = mutation({
+  args: {
+    communicationId: v.id("communications"),
+    aiSummary: v.optional(v.string()),
+    urgencyScore: v.optional(v.number()),
+    metadata: v.optional(v.object({
+      from: v.optional(v.string()),
+      to: v.optional(v.string()),
+      cc: v.optional(v.string()),
+      bcc: v.optional(v.string()),
+      messageId: v.optional(v.string()),
+      threadId: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Unauthorized");
+
+    const communication = await ctx.db.get(args.communicationId);
+    if (!communication || communication.consultantId !== user._id) {
+      throw new Error("Communication not found");
+    }
+
+    const updates: any = {};
+    if (args.aiSummary !== undefined) updates.aiSummary = args.aiSummary;
+    if (args.urgencyScore !== undefined) updates.urgencyScore = args.urgencyScore;
+    if (args.metadata !== undefined) updates.metadata = args.metadata;
+
+    await ctx.db.patch(args.communicationId, updates);
+    return args.communicationId;
+  },
+});
