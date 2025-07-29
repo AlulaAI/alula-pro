@@ -94,6 +94,14 @@ export default function AlulaDashboard() {
               <MessageCircle className="mr-2 h-4 w-4" />
               Log Communication
             </Button>
+            <Button
+              onClick={handleSeedData}
+              variant="outline"
+              size="sm"
+            >
+              <Database className="mr-2 h-3 w-3" />
+              Test Data
+            </Button>
           </div>
         </div>
 

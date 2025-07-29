@@ -17,6 +17,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
+    profileImage: v.optional(v.string()),
     status: v.union(v.literal("active"), v.literal("inactive")),
     createdAt: v.number(),
     lastContactedAt: v.optional(v.number()),

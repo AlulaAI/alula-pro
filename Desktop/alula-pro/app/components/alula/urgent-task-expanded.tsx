@@ -4,6 +4,7 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Textarea } from "~/components/ui/textarea";
 import { Separator } from "~/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import {
   AlertCircle,
   MessageSquare,
@@ -38,6 +39,7 @@ interface UrgentTaskExpandedProps {
     client?: {
       _id: string;
       name: string;
+      profileImage?: string;
     } | null;
     communication?: {
       _id: string;
@@ -161,9 +163,37 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
     return recommendations;
   };
 
+  // Get initials for avatar fallback
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <Card className="border-l-4 border-l-red-500 shadow-lg">
-      {/* Header */}
+      {/* Client Profile Header */}
+      {action.client && (
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 p-4 border-b">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+              <AvatarImage src={action.client.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${action.client.name}`} />
+              <AvatarFallback className="bg-red-100 text-red-700 font-semibold">
+                {getInitials(action.client.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-[#10292E]">{action.client.name}</h3>
+              <p className="text-xs text-[#737373]">Client since {formatDistanceToNow(new Date(action.createdAt - 90 * 24 * 60 * 60 * 1000), { addSuffix: true })}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Task Header */}
       <div className="p-4 pb-2">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -176,12 +206,6 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
             </div>
             
             <div className="flex items-center gap-3 text-xs text-[#737373]">
-              {action.client && (
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  {action.client.name}
-                </span>
-              )}
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {formatDistanceToNow(new Date(action.createdAt), { addSuffix: true })}
