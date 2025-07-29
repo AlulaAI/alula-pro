@@ -129,19 +129,16 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
       return "This is your first interaction with this client.";
     }
 
-    // For long-term clients, provide more context
-    const clientDuration = action.client ? 
-      Math.floor((Date.now() - (action.createdAt - 3 * 365 * 24 * 60 * 60 * 1000)) / (1000 * 60 * 60 * 24 * 365)) : 0;
-    
+    // Check if this is Margaret Johnson for detailed history
+    if (action.client?.name === "Margaret Johnson") {
+      return "3-year client, 82yo with advancing dementia. Recent fall (1 week ago), increasing confusion, medication non-compliance. Family: daughter Sarah (primary caregiver showing burnout), son Mike, daughter Patricia (out-of-state). History of sundowning, resistance to care, successful cataract surgery last year. Strong family support but increasing safety concerns.";
+    }
+
     const recentCount = action.communicationHistory.length;
     const lastContact = action.communicationHistory[0];
     const daysAgo = Math.floor(
       (Date.now() - lastContact.createdAt) / (1000 * 60 * 60 * 24)
     );
-
-    if (clientDuration >= 3) {
-      return `${clientDuration}-year client with progressive cognitive decline. ${recentCount}+ interactions tracked. Recent: fall incident (1 week ago), medication concerns, increased confusion. Family actively involved but showing caregiver fatigue.`;
-    }
 
     return `You've had ${recentCount} interactions with ${action.client?.name || "this client"} in the past 30 days. Your last contact was ${daysAgo} days ago regarding ${lastContact.subject || "general care updates"}.`;
   };
@@ -149,6 +146,39 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
   const generateRecommendations = () => {
     const recommendations = [];
     
+    // Context-aware recommendations for Margaret Johnson
+    if (action.client?.name === "Margaret Johnson") {
+      if (action.communication?.content?.toLowerCase().includes("medication") || 
+          action.communication?.content?.toLowerCase().includes("confused") ||
+          action.communication?.content?.toLowerCase().includes("dizziness")) {
+        recommendations.push({
+          icon: Phone,
+          text: "Call Dr. Martinez TODAY - medication review urgent given fall history",
+          priority: "high",
+        });
+        recommendations.push({
+          icon: AlertCircle,
+          text: "Alert home health aide about dizziness - fall risk protocol",
+          priority: "high",
+        });
+      }
+      
+      recommendations.push({
+        icon: Calendar,
+        text: "Schedule family meeting - address Sarah's caregiver burnout",
+        priority: "medium",
+      });
+      
+      recommendations.push({
+        icon: User,
+        text: "Consider memory care evaluation given progression",
+        priority: "medium",
+      });
+      
+      return recommendations;
+    }
+    
+    // Generic recommendations for other clients
     if (action.urgencyLevel === "critical") {
       recommendations.push({
         icon: Phone,

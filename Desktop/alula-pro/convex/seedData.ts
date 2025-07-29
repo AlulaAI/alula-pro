@@ -72,7 +72,7 @@ export const seedTestData = mutation({
       subject: "Concerns about Mom's medication",
       content: "The family called to express concerns about Margaret's new medication. She seems more confused than usual and has been experiencing dizziness. They want to know if this is a normal side effect or if they should contact her doctor immediately.",
       urgencyScore: 85,
-      aiSummary: "Family reports increased confusion and dizziness after new medication - urgent medical consultation may be needed",
+      aiSummary: "CRITICAL: New medication causing confusion/dizziness in fall-risk client with dementia. Margaret had fall 1 week ago. Pattern of medication sensitivity noted in history. Dr. Martinez review urgent.",
       metadata: {
         phoneNumber: "(555) 123-4567",
         from: "Margaret's daughter Sarah",
