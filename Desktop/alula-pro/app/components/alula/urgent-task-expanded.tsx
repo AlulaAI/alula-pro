@@ -95,6 +95,34 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
     low: "bg-gray-100 text-gray-800 border-gray-200",
   };
 
+  const urgencyBorderColors = {
+    critical: "border-l-red-500",
+    high: "border-l-orange-500",
+    medium: "border-l-yellow-500",
+    low: "border-l-gray-400",
+  };
+
+  const urgencyGradients = {
+    critical: "from-red-50 to-orange-50",
+    high: "from-orange-50 to-amber-50",
+    medium: "from-yellow-50 to-amber-50",
+    low: "from-gray-50 to-slate-50",
+  };
+
+  const urgencyAvatarColors = {
+    critical: "bg-red-100 text-red-700",
+    high: "bg-orange-100 text-orange-700",
+    medium: "bg-yellow-100 text-yellow-700",
+    low: "bg-gray-100 text-gray-700",
+  };
+
+  const urgencyIconColors = {
+    critical: "text-red-600",
+    high: "text-orange-600",
+    medium: "text-yellow-600",
+    low: "text-gray-600",
+  };
+
   const handleReply = async () => {
     if (!replyContent.trim() || !action.clientId) return;
 
@@ -221,15 +249,15 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
   };
 
   return (
-    <Card className="border-l-4 border-l-red-500 shadow-lg">
+    <Card className={`border-l-4 ${urgencyBorderColors[action.urgencyLevel]} shadow-lg`}>
       {/* Combined Header with Client and Task Info */}
-      <div className="bg-gradient-to-r from-red-50 to-orange-50 p-3 border-b">
+      <div className={`bg-gradient-to-r ${urgencyGradients[action.urgencyLevel]} p-3 border-b`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1">
             {action.client && (
               <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                 <AvatarImage src={action.client.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${action.client.name}`} />
-                <AvatarFallback className="bg-red-100 text-red-700 font-semibold text-sm">
+                <AvatarFallback className={`${urgencyAvatarColors[action.urgencyLevel]} font-semibold text-sm`}>
                   {getInitials(action.client.name)}
                 </AvatarFallback>
               </Avatar>
@@ -241,7 +269,7 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                     <h3 className="text-base font-semibold text-[#10292E]">{action.client.name}</h3>
                   )}
                   <div className="flex items-center gap-2 mt-0.5">
-                    <AlertCircle className="h-3 w-3 text-red-600" />
+                    <AlertCircle className={`h-3 w-3 ${urgencyIconColors[action.urgencyLevel]}`} />
                     <h2 className="text-sm font-medium text-[#10292E]">{action.title}</h2>
                   </div>
                 </div>
@@ -256,7 +284,7 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                   {formatDistanceToNow(new Date(action.createdAt), { addSuffix: true })}
                 </span>
                 {action.dueDate && (
-                  <span className="flex items-center gap-1 text-red-600">
+                  <span className={`flex items-center gap-1 ${urgencyIconColors[action.urgencyLevel]}`}>
                     <Calendar className="h-2.5 w-2.5" />
                     Due {format(new Date(action.dueDate), "MMM d, h:mm a")}
                   </span>

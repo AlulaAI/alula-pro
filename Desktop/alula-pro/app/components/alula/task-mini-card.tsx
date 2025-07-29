@@ -15,6 +15,7 @@ interface TaskMiniCardProps {
     } | null;
   };
   onClick: () => void;
+  isSelected?: boolean;
 }
 
 const urgencyColors = {
@@ -31,12 +32,12 @@ const urgencyBorderColors = {
   low: "border-l-2 border-l-gray-400",
 };
 
-export function TaskMiniCard({ action, onClick }: TaskMiniCardProps) {
+export function TaskMiniCard({ action, onClick, isSelected }: TaskMiniCardProps) {
   return (
     <Card
       className={`p-2 hover:shadow-md transition-all cursor-pointer hover:scale-[1.02] ${
         urgencyBorderColors[action.urgencyLevel]
-      }`}
+      } ${isSelected ? 'ring-2 ring-[#87CEEB] bg-[#87CEEB]/5' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between gap-2">

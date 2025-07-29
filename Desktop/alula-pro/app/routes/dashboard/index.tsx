@@ -9,7 +9,7 @@ import { ClientModal } from "~/components/alula/client-modal";
 import { CommunicationModal } from "~/components/alula/communication-modal";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Plus, Users, MessageCircle, Database, Bug, AlertTriangle } from "lucide-react";
+import { Plus, Users, MessageCircle, Database, Bug, AlertTriangle, Mail } from "lucide-react";
 import { EmptyState } from "~/components/alula/empty-state";
 import { toast } from "sonner";
 
@@ -23,15 +23,28 @@ export default function AlulaDashboard() {
   const clients = useQuery(api.clients.list) || [];
   const authDebug = useQuery(api.debug.checkAuth);
 
-  // Get the most urgent action
-  const urgentAction = actions.length > 0 ? actions[0] : null;
-  const otherActions = actions.slice(1);
+  // Use selectedActionId if set, otherwise show the most urgent (first) action
+  const displayedActionId = selectedActionId || (actions.length > 0 ? actions[0]._id : null);
+  const displayedAction = actions.find(a => a._id === displayedActionId);
+  
+  // Get all actions except the one being displayed
+  const otherActions = actions.filter(a => a._id !== displayedActionId);
 
-  // Get detailed information for the urgent action
-  const urgentActionDetails = useQuery(
+  // Get detailed information for the displayed action
+  const displayedActionDetails = useQuery(
     api.actions.getActionWithDetails,
-    urgentAction ? { actionId: urgentAction._id } : "skip"
+    displayedActionId ? { actionId: displayedActionId } : "skip"
   );
+
+  // Ensure we always have detailed data for the displayed action
+  const actionToDisplay = displayedActionDetails || (displayedAction ? {
+    ...displayedAction,
+    client: displayedAction.client || null,
+    communication: null,
+    communicationHistory: [],
+    aiSummary: displayedAction.summary,
+    aiRecommendations: []
+  } : null);
 
   const archiveAction = useMutation(api.actions.archive);
   const snoozeAction = useMutation(api.actions.snooze);
@@ -39,6 +52,10 @@ export default function AlulaDashboard() {
 
   const handleArchive = async (actionId: string) => {
     await archiveAction({ actionId });
+    // Clear selection if we just archived the selected action
+    if (actionId === selectedActionId) {
+      setSelectedActionId(null);
+    }
   };
 
   const handleSnooze = async (actionId: string, hours: number) => {
@@ -70,13 +87,24 @@ export default function AlulaDashboard() {
       <div className="flex flex-col gap-4 p-3 md:p-4">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+          <div className="relative">
             <h1 className="text-xl font-semibold text-[#10292E]">
               Good morning! Here's what matters most today.
             </h1>
             <p className="text-sm text-[#737373] mt-0.5">
               You're making a difference. Let's see who needs your support.
             </p>
+            {/* Hidden test email button - appears on hover in top-left corner */}
+            <a href="/dashboard/test-email" className="absolute -top-2 -left-2 opacity-0 hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 p-0"
+                title="Test Email Interface"
+              >
+                <Mail className="h-3 w-3" />
+              </Button>
+            </a>
           </div>
           <div className="flex gap-2">
             <Button
@@ -143,26 +171,15 @@ export default function AlulaDashboard() {
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Urgent Task - Takes up 2 columns on large screens */}
+            {/* Selected Task - Takes up 2 columns on large screens */}
             <div className="lg:col-span-2">
-              {urgentActionDetails ? (
+              {actionToDisplay && (
                 <UrgentTaskExpanded
-                  action={urgentActionDetails}
-                  onArchive={() => handleArchive(urgentAction!._id)}
-                  onSnooze={(hours) => handleSnooze(urgentAction!._id, hours)}
+                  action={actionToDisplay}
+                  onArchive={() => handleArchive(displayedActionId!)}
+                  onSnooze={(hours) => handleSnooze(displayedActionId!, hours)}
                 />
-              ) : urgentAction ? (
-                <ActionCard
-                  action={urgentAction}
-                  onArchive={() => handleArchive(urgentAction._id)}
-                  onSnooze={(hours) => handleSnooze(urgentAction._id, hours)}
-                  onReply={() => {
-                    if (urgentAction.clientId) {
-                      handleAddCommunication(urgentAction.clientId);
-                    }
-                  }}
-                />
-              ) : null}
+              )}
             </div>
 
             {/* Other Tasks - Side panel */}
@@ -181,6 +198,7 @@ export default function AlulaDashboard() {
                       key={action._id}
                       action={action}
                       onClick={() => setSelectedActionId(action._id)}
+                      isSelected={action._id === displayedActionId}
                     />
                   ))}
                 </div>
