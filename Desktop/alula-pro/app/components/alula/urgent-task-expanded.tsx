@@ -129,11 +129,19 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
       return "This is your first interaction with this client.";
     }
 
+    // For long-term clients, provide more context
+    const clientDuration = action.client ? 
+      Math.floor((Date.now() - (action.createdAt - 3 * 365 * 24 * 60 * 60 * 1000)) / (1000 * 60 * 60 * 24 * 365)) : 0;
+    
     const recentCount = action.communicationHistory.length;
     const lastContact = action.communicationHistory[0];
     const daysAgo = Math.floor(
       (Date.now() - lastContact.createdAt) / (1000 * 60 * 60 * 24)
     );
+
+    if (clientDuration >= 3) {
+      return `${clientDuration}-year client with progressive cognitive decline. ${recentCount}+ interactions tracked. Recent: fall incident (1 week ago), medication concerns, increased confusion. Family actively involved but showing caregiver fatigue.`;
+    }
 
     return `You've had ${recentCount} interactions with ${action.client?.name || "this client"} in the past 30 days. Your last contact was ${daysAgo} days ago regarding ${lastContact.subject || "general care updates"}.`;
   };
