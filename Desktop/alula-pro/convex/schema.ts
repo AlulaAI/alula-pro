@@ -42,6 +42,8 @@ export default defineSchema({
     metadata: v.optional(v.object({
       from: v.optional(v.string()),
       to: v.optional(v.string()),
+      cc: v.optional(v.string()),
+      bcc: v.optional(v.string()),
       messageId: v.optional(v.string()),
       threadId: v.optional(v.string()),
       phoneNumber: v.optional(v.string()),

@@ -92,7 +92,8 @@ export const seedTestData = mutation({
       aiSummary: "Positive update on care plan implementation - routine follow-up requested",
       metadata: {
         from: "sarah.johnson@example.com",
-        to: "consultant@alulacare.com",
+        to: "consultant@alulacare.com, familycare@alulacare.com",
+        cc: "brother.mike@example.com",
         messageId: "msg-12345",
         threadId: "thread-12345",
       },

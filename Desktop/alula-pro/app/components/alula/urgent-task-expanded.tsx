@@ -71,9 +71,12 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
   const [isExpanded, setIsExpanded] = useState(true);
   const [replyContent, setReplyContent] = useState("");
   const [isReplying, setIsReplying] = useState(false);
+  const [replyToAll, setReplyToAll] = useState(false);
+  const [internalNote, setInternalNote] = useState("");
   
   const createCommunication = useMutation(api.communications.create);
   const sendGmailReply = useMutation(api.gmailActions.sendReply);
+  const createInternalNote = useMutation(api.communications.createInternalNote);
   
   // Debug logging
   console.log("UrgentTaskExpanded action:", action);
@@ -175,47 +178,46 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
 
   return (
     <Card className="border-l-4 border-l-red-500 shadow-lg">
-      {/* Client Profile Header */}
-      {action.client && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 p-4 border-b">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-              <AvatarImage src={action.client.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${action.client.name}`} />
-              <AvatarFallback className="bg-red-100 text-red-700 font-semibold">
-                {getInitials(action.client.name)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-[#10292E]">{action.client.name}</h3>
-              <p className="text-xs text-[#737373]">Client since {formatDistanceToNow(new Date(action.createdAt - 90 * 24 * 60 * 60 * 1000), { addSuffix: true })}</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Task Header */}
-      <div className="p-4 pb-2">
+      {/* Combined Header with Client and Task Info */}
+      <div className="bg-gradient-to-r from-red-50 to-orange-50 p-4 border-b">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <h2 className="text-lg font-semibold text-[#10292E]">{action.title}</h2>
-              <Badge className={urgencyColors[action.urgencyLevel]}>
-                {action.urgencyLevel}
-              </Badge>
-            </div>
-            
-            <div className="flex items-center gap-3 text-xs text-[#737373]">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatDistanceToNow(new Date(action.createdAt), { addSuffix: true })}
-              </span>
-              {action.dueDate && (
-                <span className="flex items-center gap-1 text-red-600">
-                  <Calendar className="h-3 w-3" />
-                  Due {format(new Date(action.dueDate), "MMM d, h:mm a")}
+          <div className="flex items-start gap-3 flex-1">
+            {action.client && (
+              <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+                <AvatarImage src={action.client.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${action.client.name}`} />
+                <AvatarFallback className="bg-red-100 text-red-700 font-semibold">
+                  {getInitials(action.client.name)}
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div className="flex-1">
+              <div className="flex items-start justify-between">
+                <div>
+                  {action.client && (
+                    <h3 className="text-lg font-semibold text-[#10292E] mb-1">{action.client.name}</h3>
+                  )}
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <h2 className="text-base font-medium text-[#10292E]">{action.title}</h2>
+                  </div>
+                </div>
+                <Badge className={`${urgencyColors[action.urgencyLevel]} ml-2`}>
+                  {action.urgencyLevel}
+                </Badge>
+              </div>
+              
+              <div className="flex items-center gap-3 text-xs text-[#737373]">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDistanceToNow(new Date(action.createdAt), { addSuffix: true })}
                 </span>
-              )}
+                {action.dueDate && (
+                  <span className="flex items-center gap-1 text-red-600">
+                    <Calendar className="h-3 w-3" />
+                    Due {format(new Date(action.dueDate), "MMM d, h:mm a")}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -252,11 +254,11 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                         <span className="text-[#10292E] font-medium">{action.communication.metadata.from}</span>
                       </div>
                     )}
-                    {action.client && (
+                    {action.communication.metadata?.to && (
                       <div className="flex items-center gap-2">
-                        <User className="h-3 w-3 text-[#737373]" />
-                        <span className="text-[#737373]">Client:</span>
-                        <span className="text-[#10292E] font-medium">{action.client.name}</span>
+                        <Mail className="h-3 w-3 text-[#737373]" />
+                        <span className="text-[#737373]">To:</span>
+                        <span className="text-[#10292E] font-medium">{action.communication.metadata.to}</span>
                       </div>
                     )}
                   </div>
@@ -326,18 +328,31 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
             </div>
 
             {/* Reply Section */}
-            <div>
-              <div className="flex items-center gap-1 mb-2">
-                <MessageSquare className="h-3 w-3 text-[#737373]" />
-                <h3 className="font-medium text-sm text-[#10292E]">Reply</h3>
-              </div>
-              <Textarea
-                placeholder="Type your reply here..."
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                className="min-h-[60px] mb-2 text-sm"
-              />
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3 text-[#737373]" />
+                    <h3 className="font-medium text-sm text-[#10292E]">Reply</h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={replyToAll}
+                        onChange={(e) => setReplyToAll(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-[#737373]">Reply All</span>
+                    </label>
+                  </div>
+                </div>
+                <Textarea
+                  placeholder={replyToAll ? "Reply to all recipients..." : "Reply to sender..."}
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  className="min-h-[60px] mb-2 text-sm"
+                />
                 <div className="flex gap-2">
                   <Button
                     onClick={handleReply}
@@ -345,8 +360,29 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                     className="bg-[#87CEEB] text-[#10292E] hover:bg-[#87CEEB]/90 h-8 text-xs"
                   >
                     <Send className="h-3 w-3 mr-1" />
-                    Send Reply
+                    {replyToAll ? "Reply All" : "Reply"}
                   </Button>
+                </div>
+              </div>
+
+              {/* Internal Note Section */}
+              <div className="border-t pt-3">
+                <div className="flex items-center gap-1 mb-2">
+                  <MessageSquare className="h-3 w-3 text-[#737373]" />
+                  <h3 className="font-medium text-sm text-[#10292E]">Internal Note</h3>
+                  <span className="text-[10px] text-[#737373]">(not sent to client)</span>
+                </div>
+                <Textarea
+                  placeholder="Add a private note about this interaction..."
+                  value={internalNote}
+                  onChange={(e) => setInternalNote(e.target.value)}
+                  className="min-h-[40px] mb-2 text-sm"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between border-t pt-3">
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
                     onClick={() => onSnooze(4)}
@@ -357,12 +393,28 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                   </Button>
                 </div>
                 <Button
-                  variant="ghost"
-                  onClick={onArchive}
-                  className="h-8 text-xs"
+                  onClick={async () => {
+                    // Save internal note before archiving
+                    if (internalNote.trim() && action.clientId) {
+                      try {
+                        await createInternalNote({
+                          clientId: action.clientId,
+                          content: internalNote,
+                          relatedActionId: action._id,
+                          relatedCommunicationId: action.communicationId,
+                        });
+                        toast.success("Internal note saved");
+                      } catch (error) {
+                        toast.error("Failed to save internal note");
+                        return;
+                      }
+                    }
+                    onArchive();
+                  }}
+                  className="bg-[#10292E] hover:bg-[#10292E]/90 h-8 text-xs"
                 >
                   <Archive className="h-3 w-3 mr-1" />
-                  Archive
+                  Complete & Archive
                 </Button>
               </div>
             </div>

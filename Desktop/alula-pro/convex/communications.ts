@@ -135,3 +135,39 @@ export const archive = mutation({
     });
   },
 });
+
+export const createInternalNote = mutation({
+  args: {
+    clientId: v.id("clients"),
+    content: v.string(),
+    relatedActionId: v.optional(v.id("actions")),
+    relatedCommunicationId: v.optional(v.id("communications")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Unauthorized");
+
+    // Verify client belongs to consultant
+    const client = await ctx.db.get(args.clientId);
+    if (!client || client.consultantId !== user._id) {
+      throw new Error("Client not found");
+    }
+
+    // Create internal note as a communication
+    const noteId = await ctx.db.insert("communications", {
+      clientId: args.clientId,
+      consultantId: user._id,
+      type: "in_person", // Using in_person as internal note type
+      direction: "outbound",
+      subject: "Internal Note",
+      content: args.content,
+      metadata: {
+        from: user.name || user.email || "Consultant",
+      },
+      status: "active",
+      createdAt: Date.now(),
+    });
+
+    return noteId;
+  },
+});
