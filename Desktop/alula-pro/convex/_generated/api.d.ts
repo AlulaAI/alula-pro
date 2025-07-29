@@ -11,6 +11,8 @@
 import type * as actions from "../actions.js";
 import type * as ai from "../ai.js";
 import type * as aiActions from "../aiActions.js";
+import type * as aiContext from "../aiContext.js";
+import type * as clientContext from "../clientContext.js";
 import type * as clients from "../clients.js";
 import type * as communications from "../communications.js";
 import type * as debug from "../debug.js";
@@ -41,6 +43,8 @@ declare const fullApi: ApiFromModules<{
   actions: typeof actions;
   ai: typeof ai;
   aiActions: typeof aiActions;
+  aiContext: typeof aiContext;
+  clientContext: typeof clientContext;
   clients: typeof clients;
   communications: typeof communications;
   debug: typeof debug;

@@ -61,6 +61,7 @@ interface MobileTaskCardProps {
       content: string;
       createdAt: number;
     }>;
+    keyContext?: string | null;
   };
   onArchive: () => void;
   onSnooze: (hours: number) => void;
@@ -248,6 +249,19 @@ export function MobileTaskCard({
               <span className="text-xs text-gray-600">From:</span>
               <span className="text-xs font-medium text-gray-900">{senderName}</span>
             </div>
+
+            {/* Key Context */}
+            {action.keyContext && (
+              <div className="bg-gray-50 rounded-lg p-2.5 mb-3">
+                <div className="flex items-center gap-1 mb-1">
+                  <Sparkles className="h-3.5 w-3.5 text-gray-600" />
+                  <span className="text-xs font-medium text-gray-700">Key Context</span>
+                </div>
+                <p className="text-xs text-gray-800 font-medium">
+                  {action.keyContext}
+                </p>
+              </div>
+            )}
 
             {/* Email Content */}
             {action.communication && (

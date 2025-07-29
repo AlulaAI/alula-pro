@@ -58,6 +58,7 @@ interface UrgentTaskRedesignedProps {
       content: string;
       createdAt: number;
     }>;
+    keyContext?: string | null;
   };
   onArchive: () => void;
   onSnooze: (hours: number) => void;
@@ -321,9 +322,7 @@ export function UrgentTaskRedesigned({ action, onArchive, onSnooze }: UrgentTask
                 <span className="text-xs font-medium text-gray-700">Key Context</span>
               </div>
               <p className="text-sm text-gray-900 font-medium">
-                {action.client?.name === "Margaret Johnson" 
-                  ? "Fall last week • Medication non-compliance • Daughter is primary caregiver"
-                  : "First time reaching out • Family needs guidance"}
+                {action.keyContext || "New client • Needs assessment"}
               </p>
             </div>
 
@@ -334,9 +333,28 @@ export function UrgentTaskRedesigned({ action, onArchive, onSnooze }: UrgentTask
                 <span className="text-xs font-medium text-gray-700">Recommended Action</span>
               </div>
               <p className="text-sm text-gray-900 font-medium">
-                {action.urgencyLevel === "critical" 
-                  ? "Contact Dr. Martinez today - medication review urgent"
-                  : "Schedule assessment call within 24-48 hours"}
+                {(() => {
+                  // Generate recommendations based on context
+                  if (action.urgencyLevel === "critical") {
+                    if (action.keyContext?.toLowerCase().includes("medication")) {
+                      return "Contact healthcare provider about medication concerns";
+                    }
+                    if (action.keyContext?.toLowerCase().includes("fall")) {
+                      return "Arrange immediate safety assessment";
+                    }
+                    return "Respond immediately - urgent care needed";
+                  }
+                  
+                  if (action.type === "lead") {
+                    return "Schedule initial assessment within 24-48 hours";
+                  }
+                  
+                  if (action.keyContext?.toLowerCase().includes("hospital")) {
+                    return "Follow up on recent hospitalization";
+                  }
+                  
+                  return "Respond within 24 hours";
+                })()}
               </p>
             </div>
           </div>

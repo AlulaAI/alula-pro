@@ -227,11 +227,78 @@ export const getActionWithDetails = query({
         .take(10);
     }
 
+    // Generate key context for the client
+    let keyContext = null;
+    if (action.clientId) {
+      // Get recent communications for context
+      const recentComms = await ctx.db
+        .query("communications")
+        .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
+        .order("desc")
+        .take(5);
+
+      // Get internal notes
+      const notes = await ctx.db
+        .query("notes")
+        .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
+        .order("desc")
+        .take(3);
+
+      // Build context
+      const contextParts = [];
+
+      // Check for health keywords
+      const healthKeywords = ["medication", "fall", "confusion", "pain", "hospital", "doctor", "dementia", "alzheimer", "surgery", "therapy"];
+      const healthConcerns = new Set<string>();
+      
+      for (const comm of recentComms) {
+        const content = (comm.content + " " + (comm.subject || "")).toLowerCase();
+        for (const keyword of healthKeywords) {
+          if (content.includes(keyword)) {
+            healthConcerns.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+          }
+        }
+      }
+
+      if (healthConcerns.size > 0) {
+        contextParts.push(Array.from(healthConcerns).slice(0, 2).join("/") + " issues");
+      }
+
+      // Check for family context
+      const familyKeywords = ["daughter", "son", "spouse", "wife", "husband", "caregiver", "family", "brother", "sister"];
+      const familyMembers = new Set<string>();
+      
+      for (const comm of recentComms) {
+        const content = comm.content.toLowerCase();
+        for (const keyword of familyKeywords) {
+          if (content.includes(keyword)) {
+            familyMembers.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+          }
+        }
+      }
+
+      if (familyMembers.size > 0) {
+        contextParts.push(Array.from(familyMembers).slice(0, 1).join(", ") + " is caregiver");
+      }
+
+      // Add timing/frequency context
+      if (communicationHistory.length > 3) {
+        contextParts.push(`${communicationHistory.length}+ recent contacts`);
+      } else if (communicationHistory.length === 1) {
+        contextParts.push("First contact");
+      }
+
+      keyContext = contextParts.length > 0 
+        ? contextParts.slice(0, 3).join(" • ")
+        : "New client • Needs assessment";
+    }
+
     return {
       ...action,
       client,
       communication,
       communicationHistory,
+      keyContext,
     };
   },
 });
