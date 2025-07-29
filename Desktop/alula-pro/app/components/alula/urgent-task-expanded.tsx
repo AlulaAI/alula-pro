@@ -5,6 +5,8 @@ import { Badge } from "~/components/ui/badge";
 import { Textarea } from "~/components/ui/textarea";
 import { Separator } from "~/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Input } from "~/components/ui/input";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   AlertCircle,
   MessageSquare,
@@ -19,6 +21,7 @@ import {
   Calendar,
   Sparkles,
   UserCircle,
+  Timer,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useMutation } from "convex/react";
@@ -73,10 +76,13 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
   const [isReplying, setIsReplying] = useState(false);
   const [replyToAll, setReplyToAll] = useState(false);
   const [internalNote, setInternalNote] = useState("");
+  const [billableTime, setBillableTime] = useState("");
+  const [isBillable, setIsBillable] = useState(true);
   
   const createCommunication = useMutation(api.communications.create);
   const sendGmailReply = useMutation(api.gmailActions.sendReply);
   const createInternalNote = useMutation(api.communications.createInternalNote);
+  const createTimeEntry = useMutation(api.timeEntries.createTimeEntry);
   
   // Debug logging
   console.log("UrgentTaskExpanded action:", action);
@@ -338,8 +344,8 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                   <Sparkles className="h-2.5 w-2.5 text-[#87CEEB]" />
                   <h3 className="font-medium text-xs text-[#10292E]">Client History</h3>
                 </div>
-                <p className="text-[10px] text-[#737373] bg-blue-50 p-1.5 rounded leading-tight">
-                  {action.communication?.aiSummary || generateHistorySummary()}
+                <p className="text-xs text-[#737373] bg-blue-50 p-2 rounded leading-relaxed">
+                  {generateHistorySummary()}
                 </p>
               </div>
 
@@ -353,10 +359,10 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                   {generateRecommendations().slice(0, 2).map((rec, index) => (
                     <div
                       key={index}
-                      className="flex items-start gap-1 p-1 bg-gray-50 rounded text-[10px]"
+                      className="flex items-start gap-1.5 p-1.5 bg-gray-50 rounded text-xs"
                     >
-                      <rec.icon className="h-2.5 w-2.5 text-[#737373] mt-0.5 flex-shrink-0" />
-                      <span className="text-[#10292E] flex-1 leading-tight">{rec.text}</span>
+                      <rec.icon className="h-3 w-3 text-[#737373] mt-0.5 flex-shrink-0" />
+                      <span className="text-[#10292E] flex-1 leading-relaxed">{rec.text}</span>
                     </div>
                   ))}
                 </div>
@@ -416,6 +422,37 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                   onChange={(e) => setInternalNote(e.target.value)}
                   className="min-h-[35px] mb-1.5 text-xs"
                 />
+                
+                {/* Billable Time Section */}
+                <div className="flex items-start gap-2 mt-2 p-2 bg-gray-50 rounded">
+                  <Timer className="h-3 w-3 text-[#737373] mt-1" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={billableTime}
+                        onChange={(e) => setBillableTime(e.target.value)}
+                        className="w-16 h-7 text-xs"
+                        min="0"
+                        step="15"
+                      />
+                      <span className="text-xs text-[#737373]">minutes</span>
+                      <div className="flex items-center gap-1 ml-auto">
+                        <Checkbox
+                          id="billable"
+                          checked={isBillable}
+                          onCheckedChange={(checked) => setIsBillable(checked as boolean)}
+                          className="h-3 w-3"
+                        />
+                        <label htmlFor="billable" className="text-xs text-[#737373] cursor-pointer">
+                          Billable
+                        </label>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-[#737373]">Track time spent on this task</p>
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -430,22 +467,37 @@ export function UrgentTaskExpanded({ action, onArchive, onSnooze }: UrgentTaskEx
                 </Button>
                 <Button
                   onClick={async () => {
-                    // Save internal note before archiving
-                    if (internalNote.trim() && action.clientId) {
-                      try {
+                    try {
+                      // Save internal note if provided
+                      if (internalNote.trim() && action.clientId) {
                         await createInternalNote({
                           clientId: action.clientId,
                           content: internalNote,
                           relatedActionId: action._id,
                           relatedCommunicationId: action.communicationId,
                         });
-                        toast.success("Internal note saved");
-                      } catch (error) {
-                        toast.error("Failed to save internal note");
-                        return;
                       }
+
+                      // Save billable time if provided
+                      if (billableTime && parseFloat(billableTime) > 0 && action.clientId) {
+                        await createTimeEntry({
+                          clientId: action.clientId,
+                          duration: parseFloat(billableTime),
+                          description: `Time spent on: ${action.title}${internalNote ? ` - ${internalNote}` : ''}`,
+                          billable: isBillable,
+                          relatedActionId: action._id,
+                          relatedCommunicationId: action.communicationId,
+                        });
+                      }
+
+                      if (internalNote.trim() || (billableTime && parseFloat(billableTime) > 0)) {
+                        toast.success("Note and time entry saved");
+                      }
+                      
+                      onArchive();
+                    } catch (error) {
+                      toast.error("Failed to save data");
                     }
-                    onArchive();
                   }}
                   className="bg-[#10292E] hover:bg-[#10292E]/90 h-7 text-xs px-3"
                 >

@@ -19,6 +19,7 @@ import type * as gmailActions from "../gmailActions.js";
 import type * as http from "../http.js";
 import type * as seedData from "../seedData.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as timeEntries from "../timeEntries.js";
 import type * as users from "../users.js";
 
 import type {
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   seedData: typeof seedData;
   subscriptions: typeof subscriptions;
+  timeEntries: typeof timeEntries;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

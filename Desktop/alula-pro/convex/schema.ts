@@ -160,4 +160,20 @@ export default defineSchema({
     processedAt: v.number(),
   })
     .index("by_gmail_id", ["gmailMessageId"]),
+
+  timeEntries: defineTable({
+    consultantId: v.string(),
+    clientId: v.id("clients"),
+    duration: v.number(), // in minutes
+    description: v.string(),
+    billable: v.boolean(),
+    rate: v.optional(v.number()), // hourly rate
+    relatedActionId: v.optional(v.id("actions")),
+    relatedCommunicationId: v.optional(v.id("communications")),
+    createdAt: v.number(),
+  })
+    .index("by_consultant", ["consultantId"])
+    .index("by_client", ["clientId"])
+    .index("by_billable", ["billable"])
+    .index("by_date", ["createdAt"]),
 });
