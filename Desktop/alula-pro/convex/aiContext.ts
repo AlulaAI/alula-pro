@@ -173,71 +173,75 @@ export const generateClientContext = internalAction({
 
     // Generate context prompt
     const prompt = contextData.currentCommunication 
-      ? `You are helping an eldercare consultant prepare to respond to a client message. Write a brief narrative (maximum 75 words) that provides relevant context about this client to help craft an appropriate response.
+      ? `You are trained in Teepa Snow's Positive Approach to Care™. Help an eldercare consultant respond to a client by providing a strength-based context summary (maximum 75 words, no bullet points).
 
-Current Message to Respond To:
+Current Message:
 From: ${contextData.currentCommunication.direction === 'inbound' ? contextData.client.name : 'Consultant'}
 Date: ${new Date(contextData.currentCommunication.createdAt).toLocaleDateString()}
-Subject: ${contextData.currentCommunication.subject || 'No subject'}
 Content: ${contextData.currentCommunication.content}
 
-Client Background:
-- Name: ${contextData.client.name}
-- Recent Communications: ${contextData.recentCommunications.length} in last 30 days
-- Active Care Needs: ${contextData.activeActions.length} tasks
+Client: ${contextData.client.name}
+Recent Engagement: ${contextData.recentCommunications.length} communications in 30 days
+Current Support Activities: ${contextData.activeActions.length}
 
-Recent History (last 5 communications):
+Recent Interactions:
 ${contextData.recentCommunications.slice(0, 5).map(comm => 
-  `- ${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
+  `${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
 ).join('\n')}
 
-Recent Notes:
+Care Team Notes:
 ${contextData.notes.slice(0, 3).map(note => 
-  `- ${note.content.slice(0, 50)}...`
+  `${note.content.slice(0, 50)}...`
 ).join('\n')}
 
-Write a flowing narrative that connects the client's history to the current message, highlighting only the most relevant details that would help respond appropriately. Focus on:
-1. What triggered this message
-2. Relevant health/care situation
-3. Family dynamics if pertinent
-4. Suggested tone/approach for response`
-      : `You are helping an eldercare consultant understand a client's current situation. Write a brief narrative (maximum 75 words) summarizing the most important aspects of this client's care situation.
+Write a concise summary focusing on:
+- Client's current abilities and strengths
+- What they CAN do and ARE doing well
+- Positive engagement opportunities
+- Supportive relationships and resources
+- Context for responding with encouragement
+
+Use person-first language. Focus on abilities, not disabilities. Highlight successes and positive moments.`
+      : `You are trained in Teepa Snow's Positive Approach to Care™. Provide a strength-based summary of this client (maximum 75 words, no bullet points).
 
 Client: ${contextData.client.name}
-Status: ${contextData.client.status}
-Recent Activity: ${contextData.recentCommunications.length} communications, ${contextData.activeActions.length} active tasks
+Engagement Level: ${contextData.client.status === 'active' ? 'Actively engaged' : 'Building relationship'}
+Recent Activity: ${contextData.recentCommunications.length} meaningful connections, ${contextData.activeActions.length} support opportunities
 
-Recent Communications:
+Recent Positive Interactions:
 ${contextData.recentCommunications.slice(0, 5).map(comm => 
-  `- ${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
+  `${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
 ).join('\n')}
 
-Active Needs:
+Current Support Focus:
 ${contextData.activeActions.slice(0, 3).map(action => 
-  `- ${action.urgencyLevel}: ${action.title}`
+  `${action.title}`
 ).join('\n')}
 
-Write a flowing narrative that captures their current care journey, focusing on immediate needs and recent developments. Make it personal and action-oriented.`;
+Write a concise summary highlighting:
+- What the client is doing well
+- Their strengths and abilities
+- Positive relationships and support systems
+- Opportunities for meaningful engagement
+- Recent successes or progress
+
+Use person-first, ability-focused language. Emphasize possibilities, not problems.`;
 
     try {
       if (!openai) {
         // Fallback to simple keyword-based context
-        const healthKeywords = ["medication", "fall", "confusion", "pain", "hospital", "doctor", "dementia", "alzheimer"];
-        const contextParts = [];
+        const positiveKeywords = ["visit", "walk", "activity", "family", "friend", "enjoy", "music", "garden", "cook", "read"];
+        const supportKeywords = ["daughter", "son", "spouse", "wife", "husband", "caregiver", "family", "friend", "neighbor"];
         
-        // Check recent communications for health keywords
-        const healthConcerns = new Set<string>();
+        // Check for positive activities and interests
+        const positiveActivities = new Set<string>();
         for (const comm of contextData.recentCommunications) {
           const content = (comm.content + " " + (comm.subject || "")).toLowerCase();
-          for (const keyword of healthKeywords) {
+          for (const keyword of positiveKeywords) {
             if (content.includes(keyword)) {
-              healthConcerns.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+              positiveActivities.add(keyword);
             }
           }
-        }
-        
-        if (healthConcerns.size > 0) {
-          contextParts.push(`• ${Array.from(healthConcerns).slice(0, 2).join("/")} issues`);
         }
         
         // Add family context
@@ -250,44 +254,34 @@ Write a flowing narrative that captures their current care journey, focusing on 
           }
         }
         
-        if (hasFamilyMention) {
-          contextParts.push("• Family involved in care");
-        }
-        
-        // Add urgency context
-        if (contextData.activeActions.some(a => a.urgencyLevel === "critical" || a.urgencyLevel === "high")) {
-          contextParts.push("• Urgent needs require attention");
-        }
-        
-        // Create a simple narrative for fallback
+        // Create a strength-based narrative for fallback
         let fallbackNarrative = "";
         if (contextData.currentCommunication) {
-          fallbackNarrative = `${contextData.client.name} ${contextData.currentCommunication.direction === 'inbound' ? 'reached out' : 'was contacted'} about `;
-          if (healthConcerns.size > 0) {
-            fallbackNarrative += `${Array.from(healthConcerns)[0].toLowerCase()} concerns. `;
+          fallbackNarrative = `${contextData.client.name} ${contextData.currentCommunication.direction === 'inbound' ? 'actively reached out' : 'engaged in conversation'} `;
+          if (contextData.recentCommunications.length > 5) {
+            fallbackNarrative += `and maintains regular communication. `;
           } else {
-            fallbackNarrative += "care needs. ";
+            fallbackNarrative += `showing positive engagement. `;
           }
         } else {
-          fallbackNarrative = `${contextData.client.name} is `;
+          fallbackNarrative = `${contextData.client.name} `;
           if (contextData.communicationHistory.length === 0) {
-            fallbackNarrative += "a new client requiring initial assessment. ";
+            fallbackNarrative += "is beginning their care journey with us. ";
+          } else if (contextData.communicationHistory.length > 10) {
+            fallbackNarrative += "has built a strong relationship through ${contextData.communicationHistory.length} meaningful interactions. ";
           } else {
-            fallbackNarrative += "an existing client ";
-            if (healthConcerns.size > 0) {
-              fallbackNarrative += `dealing with ${Array.from(healthConcerns)[0].toLowerCase()} issues. `;
-            } else {
-              fallbackNarrative += "needing ongoing support. ";
-            }
+            fallbackNarrative += "continues to engage positively in their care. ";
           }
         }
         
         if (hasFamilyMention) {
-          fallbackNarrative += "Family is involved in care decisions. ";
+          fallbackNarrative += "Has supportive family involvement. ";
         }
         
-        if (contextData.activeActions.some(a => a.urgencyLevel === "critical")) {
-          fallbackNarrative += "Urgent attention required.";
+        if (contextData.activeActions.length > 0) {
+          fallbackNarrative += `Currently exploring ${contextData.activeActions.length} opportunities for enhanced well-being.`;
+        } else {
+          fallbackNarrative += "Ready for new opportunities to thrive.";
         }
           
         await ctx.runMutation(internal.aiContext.setCachedContext, {
@@ -304,7 +298,7 @@ Write a flowing narrative that captures their current care journey, focusing on 
         messages: [
           {
             role: "system",
-            content: "You are an expert eldercare consultant assistant. Write brief, empathetic narratives that help consultants understand their clients' situations. Maximum 75 words, flowing prose, no bullet points.",
+            content: "You are an expert eldercare consultant trained in Teepa Snow's Positive Approach to Care™. Write concise, strength-based summaries (75 words max) that focus on abilities, not disabilities. Use person-first language, highlight what clients CAN do, and emphasize positive relationships and opportunities. No bullet points - write as a flowing summary that inspires hope and connection.",
           },
           {
             role: "user",

@@ -268,21 +268,16 @@ export const getActionWithDetails = query({
 
         const contextParts = [];
 
-        // Check for health keywords
-        const healthKeywords = ["medication", "fall", "confusion", "pain", "hospital", "doctor", "dementia", "alzheimer", "surgery", "therapy"];
-        const healthConcerns = new Set<string>();
+        // Look for positive engagement indicators
+        const engagementKeywords = ["visit", "walk", "activity", "family", "friend", "enjoy", "participate"];
+        let hasPositiveEngagement = false;
         
         for (const comm of recentComms) {
           const content = (comm.content + " " + (comm.subject || "")).toLowerCase();
-          for (const keyword of healthKeywords) {
-            if (content.includes(keyword)) {
-              healthConcerns.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
-            }
+          if (engagementKeywords.some(keyword => content.includes(keyword))) {
+            hasPositiveEngagement = true;
+            break;
           }
-        }
-
-        if (healthConcerns.size > 0) {
-          contextParts.push(Array.from(healthConcerns).slice(0, 2).join("/") + " issues");
         }
 
         // Check for family context
@@ -309,25 +304,26 @@ export const getActionWithDetails = query({
           contextParts.push("First contact");
         }
 
-        // Create a simple narrative fallback
-        if (contextParts.length > 0) {
-          keyContext = `${client.name} `;
-          if (healthConcerns.size > 0) {
-            keyContext += `is dealing with ${Array.from(healthConcerns)[0].toLowerCase()} issues`;
-          }
-          if (familyMembers.size > 0) {
-            keyContext += healthConcerns.size > 0 ? " and has " : "has ";
-            keyContext += `${Array.from(familyMembers)[0].toLowerCase()} as caregiver`;
-          }
-          if (communicationHistory.length > 3) {
-            keyContext += `. Active client with ${communicationHistory.length} recent contacts.`;
-          } else if (communicationHistory.length === 1) {
-            keyContext += ". This is their first contact.";
-          } else {
-            keyContext += ".";
-          }
+        // Create a strength-based narrative fallback
+        keyContext = `${client.name} `;
+        if (communicationHistory.length > 10) {
+          keyContext += `has built a strong relationship through ${communicationHistory.length} meaningful interactions`;
+        } else if (communicationHistory.length > 0) {
+          keyContext += `is actively engaged in their care journey`;
         } else {
-          keyContext = `${client.name} is a new client requiring comprehensive assessment.`;
+          keyContext += `is beginning their care journey with us`;
+        }
+        
+        if (familyMembers.size > 0) {
+          keyContext += ` with supportive ${Array.from(familyMembers)[0].toLowerCase()} involvement`;
+        }
+        
+        keyContext += ". ";
+        
+        if (action.urgencyLevel === "critical" || action.urgencyLevel === "high") {
+          keyContext += "Ready for immediate support and connection.";
+        } else {
+          keyContext += "Continuing to explore opportunities for enhanced well-being.";
         }
       }
     }
