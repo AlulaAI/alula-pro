@@ -63,8 +63,8 @@ export default function AlulaDashboard() {
     aiRecommendations: []
   } : null);
   
-  // Trigger AI context generation for the displayed action's client
-  useAIContext(actionToDisplay?.clientId);
+  // Trigger AI context generation for the displayed action's client and communication
+  useAIContext(actionToDisplay?.clientId, actionToDisplay?.communicationId);
 
   const archiveAction = useMutation(api.actions.archive);
   const snoozeAction = useMutation(api.actions.snooze);
@@ -135,7 +135,10 @@ export default function AlulaDashboard() {
   } : null);
   
   // Trigger AI context generation for mobile view
-  useAIContext(isMobile ? mobileActionToDisplay?.clientId : null);
+  useAIContext(
+    isMobile ? mobileActionToDisplay?.clientId : null,
+    isMobile ? mobileActionToDisplay?.communicationId : null
+  );
 
   // Show mobile layout on small screens
   if (isMobile) {

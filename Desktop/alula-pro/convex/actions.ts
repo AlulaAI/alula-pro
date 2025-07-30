@@ -233,11 +233,28 @@ export const getActionWithDetails = query({
     if (action.clientId) {
       // Check if we have a cached AI context
       const now = Date.now();
-      const cached = await ctx.db
-        .query("aiContextCache")
-        .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
-        .filter((q) => q.gt(q.field("expiresAt"), now))
-        .first();
+      // First try to find context specific to this communication
+      let cached = null;
+      if (action.communicationId) {
+        cached = await ctx.db
+          .query("aiContextCache")
+          .withIndex("by_client_comm", (q) => 
+            q.eq("clientId", action.clientId!).eq("communicationId", action.communicationId)
+          )
+          .filter((q) => q.gt(q.field("expiresAt"), now))
+          .first();
+      }
+      
+      // If no specific context, look for general client context
+      if (!cached) {
+        cached = await ctx.db
+          .query("aiContextCache")
+          .withIndex("by_client_comm", (q) => 
+            q.eq("clientId", action.clientId!).eq("communicationId", undefined)
+          )
+          .filter((q) => q.gt(q.field("expiresAt"), now))
+          .first();
+      }
       
       if (cached) {
         keyContext = cached.context;
@@ -292,9 +309,26 @@ export const getActionWithDetails = query({
           contextParts.push("First contact");
         }
 
-        keyContext = contextParts.length > 0 
-          ? contextParts.slice(0, 3).join(" • ")
-          : "New client • Needs assessment";
+        // Create a simple narrative fallback
+        if (contextParts.length > 0) {
+          keyContext = `${client.name} `;
+          if (healthConcerns.size > 0) {
+            keyContext += `is dealing with ${Array.from(healthConcerns)[0].toLowerCase()} issues`;
+          }
+          if (familyMembers.size > 0) {
+            keyContext += healthConcerns.size > 0 ? " and has " : "has ";
+            keyContext += `${Array.from(familyMembers)[0].toLowerCase()} as caregiver`;
+          }
+          if (communicationHistory.length > 3) {
+            keyContext += `. Active client with ${communicationHistory.length} recent contacts.`;
+          } else if (communicationHistory.length === 1) {
+            keyContext += ". This is their first contact.";
+          } else {
+            keyContext += ".";
+          }
+        } else {
+          keyContext = `${client.name} is a new client requiring comprehensive assessment.`;
+        }
       }
     }
 

@@ -102,8 +102,8 @@ export default function MobileDashboard() {
     aiRecommendations: []
   } : null);
   
-  // Trigger AI context generation for the current action's client
-  useAIContext(actionToDisplay?.clientId);
+  // Trigger AI context generation for the current action's client and communication
+  useAIContext(actionToDisplay?.clientId, actionToDisplay?.communicationId);
 
   // Show tutorial on first load with multiple tasks
   useEffect(() => {

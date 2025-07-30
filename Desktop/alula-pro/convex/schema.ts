@@ -179,10 +179,12 @@ export default defineSchema({
 
   aiContextCache: defineTable({
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")), // Optional: specific to a communication
     context: v.string(),
     generatedAt: v.number(),
     expiresAt: v.number(), // Cache for 24 hours
   })
     .index("by_client", ["clientId"])
+    .index("by_client_comm", ["clientId", "communicationId"])
     .index("by_expiry", ["expiresAt"]),
 });

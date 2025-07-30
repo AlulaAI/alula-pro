@@ -7,6 +7,7 @@ import { api } from "./_generated/api";
 export const generateForClient = mutation({
   args: {
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
@@ -16,6 +17,7 @@ export const generateForClient = mutation({
     // We'll return immediately and let the action run in the background
     ctx.scheduler.runAfter(0, api.aiContext.getOrGenerateContext, {
       clientId: args.clientId,
+      communicationId: args.communicationId,
     });
     
     return { started: true };

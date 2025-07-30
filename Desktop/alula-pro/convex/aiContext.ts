@@ -5,12 +5,30 @@ import { internalQuery, internalMutation } from "./_generated/server";
 export const getCachedContext = internalQuery({
   args: {
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    
+    // If we have a communication ID, look for specific context
+    if (args.communicationId) {
+      const cached = await ctx.db
+        .query("aiContextCache")
+        .withIndex("by_client_comm", (q) => 
+          q.eq("clientId", args.clientId).eq("communicationId", args.communicationId)
+        )
+        .filter((q) => q.gt(q.field("expiresAt"), now))
+        .first();
+      
+      if (cached) return cached.context;
+    }
+    
+    // Otherwise, look for general client context
     const cached = await ctx.db
       .query("aiContextCache")
-      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_client_comm", (q) => 
+        q.eq("clientId", args.clientId).eq("communicationId", undefined)
+      )
       .filter((q) => q.gt(q.field("expiresAt"), now))
       .first();
     
@@ -22,17 +40,20 @@ export const getCachedContext = internalQuery({
 export const setCachedContext = internalMutation({
   args: {
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")),
     context: v.string(),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
     
-    // Delete any existing cache for this client
+    // Delete any existing cache for this client/communication combo
     const existing = await ctx.db
       .query("aiContextCache")
-      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
-      .collect();
+      .withIndex("by_client_comm", (q) => 
+        q.eq("clientId", args.clientId).eq("communicationId", args.communicationId)
+      )
+      .take(100);
     
     for (const item of existing) {
       await ctx.db.delete(item._id);
@@ -41,6 +62,7 @@ export const setCachedContext = internalMutation({
     // Insert new cache entry
     await ctx.db.insert("aiContextCache", {
       clientId: args.clientId,
+      communicationId: args.communicationId,
       context: args.context,
       generatedAt: now,
       expiresAt,
@@ -117,6 +139,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 export const generateClientContext = internalAction({
   args: {
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")),
   },
   handler: async (ctx, args) => {
     // Fetch all client data
@@ -127,6 +150,15 @@ export const generateClientContext = internalAction({
     if (!client) {
       throw new Error("Client not found");
     }
+    
+    // Get the specific communication if provided
+    let currentCommunication = null;
+    if (args.communicationId) {
+      const comms = client.recentCommunications.find(c => c._id === args.communicationId);
+      if (comms) {
+        currentCommunication = comms;
+      }
+    }
 
     // Aggregate all context data
     const contextData = {
@@ -136,46 +168,56 @@ export const generateClientContext = internalAction({
       notes: client.notes,
       timeEntries: client.timeEntries,
       communicationHistory: client.communicationHistory,
+      currentCommunication,
     };
 
     // Generate context prompt
-    const prompt = `You are an AI assistant helping eldercare consultants understand their clients quickly. 
-    Analyze the following client data and generate a concise, actionable context summary.
+    const prompt = contextData.currentCommunication 
+      ? `You are helping an eldercare consultant prepare to respond to a client message. Write a brief narrative (maximum 75 words) that provides relevant context about this client to help craft an appropriate response.
 
-    Client Information:
-    - Name: ${contextData.client.name}
-    - Email: ${contextData.client.email || "Not provided"}
-    - Phone: ${contextData.client.phone || "Not provided"}
-    - Status: ${contextData.client.status}
-    - Last Contact: ${contextData.client.lastContactedAt ? new Date(contextData.client.lastContactedAt).toLocaleDateString() : "Never"}
+Current Message to Respond To:
+From: ${contextData.currentCommunication.direction === 'inbound' ? contextData.client.name : 'Consultant'}
+Date: ${new Date(contextData.currentCommunication.createdAt).toLocaleDateString()}
+Subject: ${contextData.currentCommunication.subject || 'No subject'}
+Content: ${contextData.currentCommunication.content}
 
-    Recent Communications (last 10):
-    ${contextData.recentCommunications.map(comm => 
-      `- ${new Date(comm.createdAt).toLocaleDateString()} - ${comm.type} (${comm.direction}): ${comm.subject || comm.content.slice(0, 100)}...`
-    ).join('\n')}
+Client Background:
+- Name: ${contextData.client.name}
+- Recent Communications: ${contextData.recentCommunications.length} in last 30 days
+- Active Care Needs: ${contextData.activeActions.length} tasks
 
-    Active Actions:
-    ${contextData.activeActions.map(action => 
-      `- ${action.urgencyLevel.toUpperCase()}: ${action.title} - ${action.summary}`
-    ).join('\n')}
+Recent History (last 5 communications):
+${contextData.recentCommunications.slice(0, 5).map(comm => 
+  `- ${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
+).join('\n')}
 
-    Internal Notes:
-    ${contextData.notes.map(note => 
-      `- ${new Date(note.createdAt).toLocaleDateString()}: ${note.content.slice(0, 100)}...`
-    ).join('\n')}
+Recent Notes:
+${contextData.notes.slice(0, 3).map(note => 
+  `- ${note.content.slice(0, 50)}...`
+).join('\n')}
 
-    Time Entries (last 5):
-    ${contextData.timeEntries.map(entry => 
-      `- ${new Date(entry.createdAt).toLocaleDateString()}: ${entry.duration} min - ${entry.description}`
-    ).join('\n')}
+Write a flowing narrative that connects the client's history to the current message, highlighting only the most relevant details that would help respond appropriately. Focus on:
+1. What triggered this message
+2. Relevant health/care situation
+3. Family dynamics if pertinent
+4. Suggested tone/approach for response`
+      : `You are helping an eldercare consultant understand a client's current situation. Write a brief narrative (maximum 75 words) summarizing the most important aspects of this client's care situation.
 
-    Generate a brief context summary (max 100 words) that includes:
-    1. Key health/care concerns or conditions
-    2. Family/caregiver situation
-    3. Recent important events or changes
-    4. Current care needs or action items
-    
-    Format as bullet points with the most critical information first. Focus on actionable insights.`;
+Client: ${contextData.client.name}
+Status: ${contextData.client.status}
+Recent Activity: ${contextData.recentCommunications.length} communications, ${contextData.activeActions.length} active tasks
+
+Recent Communications:
+${contextData.recentCommunications.slice(0, 5).map(comm => 
+  `- ${new Date(comm.createdAt).toLocaleDateString()}: ${comm.subject || comm.content.slice(0, 50)}...`
+).join('\n')}
+
+Active Needs:
+${contextData.activeActions.slice(0, 3).map(action => 
+  `- ${action.urgencyLevel}: ${action.title}`
+).join('\n')}
+
+Write a flowing narrative that captures their current care journey, focusing on immediate needs and recent developments. Make it personal and action-oriented.`;
 
     try {
       if (!openai) {
@@ -217,16 +259,44 @@ export const generateClientContext = internalAction({
           contextParts.push("• Urgent needs require attention");
         }
         
-        const fallbackContext = contextParts.length > 0 
-          ? contextParts.join("\n")
-          : "• New client\n• Needs comprehensive assessment";
+        // Create a simple narrative for fallback
+        let fallbackNarrative = "";
+        if (contextData.currentCommunication) {
+          fallbackNarrative = `${contextData.client.name} ${contextData.currentCommunication.direction === 'inbound' ? 'reached out' : 'was contacted'} about `;
+          if (healthConcerns.size > 0) {
+            fallbackNarrative += `${Array.from(healthConcerns)[0].toLowerCase()} concerns. `;
+          } else {
+            fallbackNarrative += "care needs. ";
+          }
+        } else {
+          fallbackNarrative = `${contextData.client.name} is `;
+          if (contextData.communicationHistory.length === 0) {
+            fallbackNarrative += "a new client requiring initial assessment. ";
+          } else {
+            fallbackNarrative += "an existing client ";
+            if (healthConcerns.size > 0) {
+              fallbackNarrative += `dealing with ${Array.from(healthConcerns)[0].toLowerCase()} issues. `;
+            } else {
+              fallbackNarrative += "needing ongoing support. ";
+            }
+          }
+        }
+        
+        if (hasFamilyMention) {
+          fallbackNarrative += "Family is involved in care decisions. ";
+        }
+        
+        if (contextData.activeActions.some(a => a.urgencyLevel === "critical")) {
+          fallbackNarrative += "Urgent attention required.";
+        }
           
         await ctx.runMutation(internal.aiContext.setCachedContext, {
           clientId: args.clientId,
-          context: fallbackContext,
+          communicationId: args.communicationId,
+          context: fallbackNarrative,
         });
         
-        return fallbackContext;
+        return fallbackNarrative;
       }
 
       const completion = await openai.chat.completions.create({
@@ -234,7 +304,7 @@ export const generateClientContext = internalAction({
         messages: [
           {
             role: "system",
-            content: "You are an expert eldercare consultant assistant. Provide concise, actionable context summaries.",
+            content: "You are an expert eldercare consultant assistant. Write brief, empathetic narratives that help consultants understand their clients' situations. Maximum 75 words, flowing prose, no bullet points.",
           },
           {
             role: "user",
@@ -242,7 +312,7 @@ export const generateClientContext = internalAction({
           },
         ],
         temperature: 0.3,
-        max_tokens: 150,
+        max_tokens: 100,
       });
 
       const contextSummary = completion.choices[0]?.message?.content || "";
@@ -250,6 +320,7 @@ export const generateClientContext = internalAction({
       // Store the generated context in cache
       await ctx.runMutation(internal.aiContext.setCachedContext, {
         clientId: args.clientId,
+        communicationId: args.communicationId,
         context: contextSummary,
       });
 
@@ -265,11 +336,13 @@ export const generateClientContext = internalAction({
 export const getOrGenerateContext = action({
   args: {
     clientId: v.id("clients"),
+    communicationId: v.optional(v.id("communications")),
   },
   handler: async (ctx, args) => {
     // Check cache first
     const cached = await ctx.runQuery(internal.aiContext.getCachedContext, {
       clientId: args.clientId,
+      communicationId: args.communicationId,
     });
     
     if (cached) {
@@ -279,6 +352,7 @@ export const getOrGenerateContext = action({
     // Generate new context
     return await ctx.runAction(internal.aiContext.generateClientContext, {
       clientId: args.clientId,
+      communicationId: args.communicationId,
     });
   },
 });
