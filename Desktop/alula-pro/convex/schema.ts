@@ -176,4 +176,13 @@ export default defineSchema({
     .index("by_client", ["clientId"])
     .index("by_billable", ["billable"])
     .index("by_date", ["createdAt"]),
+
+  aiContextCache: defineTable({
+    clientId: v.id("clients"),
+    context: v.string(),
+    generatedAt: v.number(),
+    expiresAt: v.number(), // Cache for 24 hours
+  })
+    .index("by_client", ["clientId"])
+    .index("by_expiry", ["expiresAt"]),
 });

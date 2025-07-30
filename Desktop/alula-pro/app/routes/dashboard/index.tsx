@@ -15,6 +15,7 @@ import { Plus, Users, MessageCircle, Database, Bug, AlertTriangle, Mail, Sparkle
 import { EmptyState } from "~/components/alula/empty-state";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
+import { useAIContext } from "~/hooks/use-ai-context";
 
 export default function AlulaDashboard() {
   const [showClientModal, setShowClientModal] = useState(false);
@@ -61,6 +62,9 @@ export default function AlulaDashboard() {
     aiSummary: displayedAction.summary,
     aiRecommendations: []
   } : null);
+  
+  // Trigger AI context generation for the displayed action's client
+  useAIContext(actionToDisplay?.clientId);
 
   const archiveAction = useMutation(api.actions.archive);
   const snoozeAction = useMutation(api.actions.snooze);
@@ -129,6 +133,9 @@ export default function AlulaDashboard() {
     aiSummary: currentMobileAction.summary,
     aiRecommendations: []
   } : null);
+  
+  // Trigger AI context generation for mobile view
+  useAIContext(isMobile ? mobileActionToDisplay?.clientId : null);
 
   // Show mobile layout on small screens
   if (isMobile) {

@@ -228,70 +228,74 @@ export const getActionWithDetails = query({
         .take(20);
     }
 
-    // Generate key context for the client
+    // For now, keep the simple keyword-based context as we can't call actions from queries
     let keyContext = null;
     if (action.clientId) {
-      // Get recent communications for context
-      const recentComms = await ctx.db
-        .query("communications")
+      // Check if we have a cached AI context
+      const now = Date.now();
+      const cached = await ctx.db
+        .query("aiContextCache")
         .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
-        .order("desc")
-        .take(5);
-
-      // Get internal notes
-      const notes = await ctx.db
-        .query("notes")
-        .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
-        .order("desc")
-        .take(3);
-
-      // Build context
-      const contextParts = [];
-
-      // Check for health keywords
-      const healthKeywords = ["medication", "fall", "confusion", "pain", "hospital", "doctor", "dementia", "alzheimer", "surgery", "therapy"];
-      const healthConcerns = new Set<string>();
+        .filter((q) => q.gt(q.field("expiresAt"), now))
+        .first();
       
-      for (const comm of recentComms) {
-        const content = (comm.content + " " + (comm.subject || "")).toLowerCase();
-        for (const keyword of healthKeywords) {
-          if (content.includes(keyword)) {
-            healthConcerns.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+      if (cached) {
+        keyContext = cached.context;
+      } else {
+        // Fallback to simple keyword-based context
+        const recentComms = await ctx.db
+          .query("communications")
+          .withIndex("by_client", (q) => q.eq("clientId", action.clientId!))
+          .order("desc")
+          .take(5);
+
+        const contextParts = [];
+
+        // Check for health keywords
+        const healthKeywords = ["medication", "fall", "confusion", "pain", "hospital", "doctor", "dementia", "alzheimer", "surgery", "therapy"];
+        const healthConcerns = new Set<string>();
+        
+        for (const comm of recentComms) {
+          const content = (comm.content + " " + (comm.subject || "")).toLowerCase();
+          for (const keyword of healthKeywords) {
+            if (content.includes(keyword)) {
+              healthConcerns.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+            }
           }
         }
-      }
 
-      if (healthConcerns.size > 0) {
-        contextParts.push(Array.from(healthConcerns).slice(0, 2).join("/") + " issues");
-      }
+        if (healthConcerns.size > 0) {
+          contextParts.push(Array.from(healthConcerns).slice(0, 2).join("/") + " issues");
+        }
 
-      // Check for family context
-      const familyKeywords = ["daughter", "son", "spouse", "wife", "husband", "caregiver", "family", "brother", "sister"];
-      const familyMembers = new Set<string>();
-      
-      for (const comm of recentComms) {
-        const content = comm.content.toLowerCase();
-        for (const keyword of familyKeywords) {
-          if (content.includes(keyword)) {
-            familyMembers.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+        // Check for family context
+        const familyKeywords = ["daughter", "son", "spouse", "wife", "husband", "caregiver", "family", "brother", "sister"];
+        const familyMembers = new Set<string>();
+        
+        for (const comm of recentComms) {
+          const content = comm.content.toLowerCase();
+          for (const keyword of familyKeywords) {
+            if (content.includes(keyword)) {
+              familyMembers.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+            }
           }
         }
-      }
 
-      if (familyMembers.size > 0) {
-        contextParts.push(Array.from(familyMembers).slice(0, 1).join(", ") + " is caregiver");
-      }
+        if (familyMembers.size > 0) {
+          contextParts.push(Array.from(familyMembers).slice(0, 1).join(", ") + " is caregiver");
+        }
 
-      // Add timing/frequency context
-      if (communicationHistory.length > 3) {
-        contextParts.push(`${communicationHistory.length}+ recent contacts`);
-      } else if (communicationHistory.length === 1) {
-        contextParts.push("First contact");
-      }
+        // Add timing/frequency context
+        if (communicationHistory.length > 3) {
+          contextParts.push(`${communicationHistory.length}+ recent contacts`);
+        } else if (communicationHistory.length === 1) {
+          contextParts.push("First contact");
+        }
 
-      keyContext = contextParts.length > 0 
-        ? contextParts.slice(0, 3).join(" • ")
-        : "New client • Needs assessment";
+        keyContext = contextParts.length > 0 
+          ? contextParts.slice(0, 3).join(" • ")
+          : "New client • Needs assessment";
+      }
     }
 
     return {

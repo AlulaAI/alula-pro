@@ -17,11 +17,13 @@ import type * as clients from "../clients.js";
 import type * as communications from "../communications.js";
 import type * as debug from "../debug.js";
 import type * as emailProcessor from "../emailProcessor.js";
+import type * as generateContext from "../generateContext.js";
 import type * as gmail from "../gmail.js";
 import type * as gmailActions from "../gmailActions.js";
 import type * as http from "../http.js";
 import type * as seedData from "../seedData.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as testAIContext from "../testAIContext.js";
 import type * as timeEntries from "../timeEntries.js";
 import type * as users from "../users.js";
 
@@ -49,11 +51,13 @@ declare const fullApi: ApiFromModules<{
   communications: typeof communications;
   debug: typeof debug;
   emailProcessor: typeof emailProcessor;
+  generateContext: typeof generateContext;
   gmail: typeof gmail;
   gmailActions: typeof gmailActions;
   http: typeof http;
   seedData: typeof seedData;
   subscriptions: typeof subscriptions;
+  testAIContext: typeof testAIContext;
   timeEntries: typeof timeEntries;
   users: typeof users;
 }>;

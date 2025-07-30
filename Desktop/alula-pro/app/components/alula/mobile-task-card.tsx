@@ -9,8 +9,8 @@ import {
   Phone,
   MessageSquare,
   Clock,
-  ChevronDown,
-  ChevronUp,
+  ChevronRight,
+  ChevronLeft,
   Sparkles,
   AlertTriangle,
   Timer,
@@ -20,12 +20,17 @@ import {
   Mail,
   X,
   Check,
+  Info,
+  ArrowRight,
+  MessageCircle,
+  History,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
+import { motion, AnimatePresence } from "motion/react";
 
 interface MobileTaskCardProps {
   action: {
@@ -72,6 +77,8 @@ interface MobileTaskCardProps {
   position?: string;
 }
 
+type ViewState = 'message' | 'context' | 'reply' | 'complete';
+
 export function MobileTaskCard({
   action,
   onArchive,
@@ -82,14 +89,16 @@ export function MobileTaskCard({
   isLast,
   position,
 }: MobileTaskCardProps) {
-  const [showReply, setShowReply] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [viewState, setViewState] = useState<ViewState>('message');
   const [replyContent, setReplyContent] = useState("");
-  const [isReplying, setIsReplying] = useState(false);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
+  const [internalNote, setInternalNote] = useState("");
+  const [timeSpent, setTimeSpent] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const createCommunication = useMutation(api.communications.create);
+  const createTimeEntry = useMutation(api.timeEntries.createTimeEntry);
+  const createInternalNote = useMutation(api.communications.createInternalNote);
 
   // Visual hierarchy colors
   const urgencyConfig = {
@@ -129,34 +138,10 @@ export function MobileTaskCard({
   const senderName = action.communication?.metadata?.from?.split('<')[0].trim() || "Unknown";
   const timeAgo = formatDistanceToNow(new Date(action.createdAt), { addSuffix: true });
 
-  // Handle swipe gestures
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe && !isLast && onSwipeLeft) {
-      onSwipeLeft();
-    }
-    if (isRightSwipe && !isFirst && onSwipeRight) {
-      onSwipeRight();
-    }
-  };
-
-  const handleQuickReply = async () => {
+  const handleSendReply = async () => {
     if (!replyContent.trim() || !action.clientId) return;
     
-    setIsReplying(true);
+    setIsProcessing(true);
     try {
       await createCommunication({
         clientId: action.clientId,
@@ -166,239 +151,404 @@ export function MobileTaskCard({
         content: replyContent,
       });
 
-      toast.success("Reply sent!");
-      setReplyContent("");
-      setShowReply(false);
-      onArchive();
+      toast.success("Reply sent successfully!");
+      setViewState('complete');
     } catch (error) {
       toast.error("Failed to send reply");
     } finally {
-      setIsReplying(false);
+      setIsProcessing(false);
     }
+  };
+
+  const handleComplete = async () => {
+    setIsProcessing(true);
+    try {
+      // Save internal note if provided
+      if (internalNote.trim() && action.clientId) {
+        await createInternalNote({
+          clientId: action.clientId,
+          content: internalNote,
+          relatedActionId: action._id,
+          relatedCommunicationId: action.communicationId,
+        });
+      }
+
+      // Save billable time if provided
+      if (timeSpent && parseFloat(timeSpent) > 0 && action.clientId) {
+        await createTimeEntry({
+          clientId: action.clientId,
+          duration: parseFloat(timeSpent),
+          description: `Time on: ${action.title}`,
+          billable: true,
+          relatedActionId: action._id,
+        });
+      }
+
+      onArchive();
+      toast.success("Task completed!");
+    } catch (error) {
+      toast.error("Failed to complete task");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Get key information
+  const getRecommendedAction = () => {
+    if (action.urgencyLevel === "critical") {
+      if (action.keyContext?.toLowerCase().includes("medication")) {
+        return "Contact healthcare provider immediately";
+      }
+      if (action.keyContext?.toLowerCase().includes("fall")) {
+        return "Arrange immediate safety assessment";
+      }
+      return "Respond immediately - urgent care needed";
+    }
+    
+    if (action.type === "lead") {
+      return "Schedule assessment within 24-48 hours";
+    }
+    
+    return "Respond within 24 hours";
   };
 
   return (
     <div 
-      className="h-full flex flex-col"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      className="h-full flex flex-col relative"
+      style={{ touchAction: isDragging ? 'none' : 'auto' }}
     >
-      <Card className={cn(
-        "flex-1 overflow-hidden flex flex-col",
-        config.border,
-        "border-l-4"
-      )}>
-        {/* Compact Header */}
-        <div className={cn(config.bg, "p-4 border-b")}>
-          <div className="flex items-start gap-3">
-            {/* Avatar */}
-            <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm flex-shrink-0">
-              <AvatarImage 
-                src={action.client?.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${action.client?.name}`} 
-              />
-              <AvatarFallback className={cn(config.bg, config.text, "font-bold text-sm")}>
-                {action.client?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '??'}
-              </AvatarFallback>
-            </Avatar>
+      {/* Minimal Progress Dots */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+        <div className={cn(
+          "h-1 w-1 rounded-full transition-all duration-300",
+          viewState === 'message' ? "w-6 bg-gray-900" : "bg-gray-300"
+        )} />
+        <div className={cn(
+          "h-1 w-1 rounded-full transition-all duration-300",
+          viewState === 'context' ? "w-6 bg-gray-900" : "bg-gray-300"
+        )} />
+        <div className={cn(
+          "h-1 w-1 rounded-full transition-all duration-300",
+          viewState === 'reply' ? "w-6 bg-gray-900" : "bg-gray-300"
+        )} />
+        <div className={cn(
+          "h-1 w-1 rounded-full transition-all duration-300",
+          viewState === 'complete' ? "w-6 bg-gray-900" : "bg-gray-300"
+        )} />
+      </div>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-sm text-gray-900 truncate">
-                  {action.client?.name || "Unknown"}
-                </h3>
-                {action.type === "lead" && (
-                  <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0">
-                    NEW
-                  </Badge>
-                )}
-                {action.type === "client" && (
-                  <Badge className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0">
-                    EXISTING
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="flex items-start gap-1.5">
-                {UrgencyIcon && <UrgencyIcon className={cn("h-4 w-4 mt-0.5", config.text)} />}
-                <p className="text-xs font-medium text-gray-700 line-clamp-2">
-                  {action.summary}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {timeAgo}
-                </span>
-                <Badge className={cn(config.badge, "text-[10px] px-1.5 py-0")}>
-                  {action.urgencyLevel}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Email Preview - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white">
-          <div className="space-y-3">
-            {/* From Line */}
-            <div className="flex items-center gap-2 pb-2 border-b">
-              <Mail className="h-3.5 w-3.5 text-gray-500" />
-              <span className="text-xs text-gray-600">From:</span>
-              <span className="text-xs font-medium text-gray-900">{senderName}</span>
-            </div>
-
-            {/* Key Context */}
-            {action.keyContext && (
-              <div className="bg-gray-50 rounded-lg p-2.5 mb-3">
-                <div className="flex items-center gap-1 mb-1">
-                  <Sparkles className="h-3.5 w-3.5 text-gray-600" />
-                  <span className="text-xs font-medium text-gray-700">Key Context</span>
+      <AnimatePresence mode="wait">
+        {viewState === 'message' && (
+          <motion.div
+            key="message"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            transition={{ duration: 0.3 }}
+            className="h-full flex flex-col"
+          >
+            {/* Message State - Clean conversation view */}
+            <div className={cn(
+              "flex-1 overflow-hidden flex flex-col bg-white",
+              action.urgencyLevel === "critical" && "border-l-4 border-red-500"
+            )}>
+              {/* Minimal Text Header */}
+              <div className="p-6 pb-4">
+                <div className="flex items-baseline justify-between mb-2">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {action.client?.name || "Unknown"}
+                  </h2>
+                  <span className="text-xs text-gray-500">{position}</span>
                 </div>
-                <p className="text-xs text-gray-800 font-medium">
-                  {action.keyContext}
+                <p className="text-sm text-gray-600">
+                  {senderName} • {timeAgo}
+                  {action.urgencyLevel === "critical" && (
+                    <span className="text-red-600 font-medium"> • Urgent</span>
+                  )}
                 </p>
               </div>
-            )}
 
-            {/* Email Content */}
-            {action.communication && (
-              <div className="text-sm text-gray-700 leading-relaxed">
-                <p className="whitespace-pre-wrap">
-                  {action.communication.content.slice(0, 300)}
-                  {action.communication.content.length > 300 && '...'}
-                </p>
-              </div>
-            )}
-
-            {/* AI Recommendations */}
-            <div className="bg-blue-50 rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                <span className="text-xs font-medium text-blue-900">Quick Actions</span>
-              </div>
-              {action.urgencyLevel === "critical" ? (
-                <div className="space-y-1.5">
-                  <button className="w-full text-left text-xs text-blue-700 font-medium">
-                    • Call Dr. Martinez about medication review
-                  </button>
-                  <button className="w-full text-left text-xs text-blue-700 font-medium">
-                    • Alert home health aide about fall risk
-                  </button>
+              {/* Message Content - Clean and readable */}
+              <div className="flex-1 overflow-y-auto px-6">
+                <div className="space-y-4">
+                  {/* Subject as conversation starter */}
+                  <h3 className="text-base font-medium text-gray-900">
+                    {action.communication?.subject || action.title}
+                  </h3>
+                  
+                  {/* Email body as message */}
+                  <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {action.communication?.content || "No message content available"}
+                  </div>
                 </div>
-              ) : (
-                <button className="w-full text-left text-xs text-blue-700 font-medium">
-                  • Schedule assessment call within 24-48 hours
+              </div>
+
+              {/* Simple Action */}
+              <div className="p-6 pt-4">
+                <button
+                  onClick={() => setViewState('context')}
+                  className="w-full py-3 text-[#10292E] font-medium text-center hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  View context →
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Bar */}
-        <div className="border-t bg-gray-50 p-3">
-          {!showReply ? (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowReply(true)}
-                size="sm"
-                className="flex-1 bg-[#10292E] hover:bg-[#10292E]/90 text-white h-10"
-              >
-                <MessageSquare className="h-4 w-4 mr-1.5" />
-                Reply
-              </Button>
-              
-              {action.urgencyLevel === "critical" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 border-red-500 text-red-600 h-10"
-                >
-                  <Phone className="h-4 w-4 mr-1.5" />
-                  Call
-                </Button>
-              )}
-              
-              <Button
-                onClick={() => setShowQuickActions(!showQuickActions)}
-                size="sm"
-                variant="ghost"
-                className="h-10 w-10 p-0"
-              >
-                {showQuickActions ? <X className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <Textarea
-                placeholder="Type your reply..."
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                className="min-h-[100px] text-sm resize-none"
-                autoFocus
-              />
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => {
-                    setShowReply(false);
-                    setReplyContent("");
-                  }}
-                  size="sm"
-                  variant="ghost"
-                  className="flex-1 h-10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleQuickReply}
-                  disabled={!replyContent.trim() || isReplying}
-                  size="sm"
-                  className="flex-1 bg-[#87CEEB] hover:bg-[#87CEEB]/90 text-[#10292E] h-10"
-                >
-                  <Send className="h-4 w-4 mr-1.5" />
-                  Send & Archive
-                </Button>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Quick Actions Panel */}
-        {showQuickActions && (
-          <div className="border-t bg-white p-3 space-y-2 animate-in slide-in-from-bottom-2">
-            <button
-              onClick={() => onSnooze(4)}
-              className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-50 active:bg-gray-100"
-            >
-              <span className="flex items-center gap-2 text-sm text-gray-700">
-                <Clock className="h-4 w-4" />
-                Snooze for 4 hours
-              </span>
-              <ChevronDown className="h-4 w-4 text-gray-400 rotate-270" />
-            </button>
-            
-            <button
-              onClick={onArchive}
-              className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-50 active:bg-gray-100"
-            >
-              <span className="flex items-center gap-2 text-sm text-gray-700">
-                <Archive className="h-4 w-4" />
-                Archive without reply
-              </span>
-              <ChevronDown className="h-4 w-4 text-gray-400 rotate-270" />
-            </button>
-          </div>
+          </motion.div>
         )}
 
-        {/* Position Indicator */}
-        {position && (
-          <div className="text-center py-2 text-[10px] text-gray-500 bg-gray-50 border-t">
-            {position}
-          </div>
+        {/* Context State - Show insights and recommendations */}
+        {viewState === 'context' && (
+          <motion.div
+            key="context"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            transition={{ duration: 0.3 }}
+            className="h-full flex flex-col"
+          >
+            <div className={cn(
+              "flex-1 overflow-hidden flex flex-col bg-white",
+              action.urgencyLevel === "critical" && "border-l-4 border-red-500"
+            )}>
+              {/* Simple Back Header */}
+              <div className="p-6 pb-4">
+                <button
+                  onClick={() => setViewState('message')}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back to message
+                </button>
+                <h2 className="text-lg font-semibold text-gray-900">About {action.client?.name?.split(' ')[0]}</h2>
+              </div>
+
+              {/* Clean Context Content */}
+              <div className="flex-1 overflow-y-auto px-6 space-y-6">
+                {/* Client Status - Simple text */}
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Client Status</p>
+                  <p className="text-base text-gray-900">
+                    {action.type === "lead" ? "New Client" : "Existing Client"} • 
+                    {action.urgencyLevel === "critical" ? " Critical Priority" : 
+                     action.urgencyLevel === "high" ? " High Priority" : 
+                     " Standard Priority"}
+                  </p>
+                </div>
+
+                {/* Key Context - Conversational */}
+                {action.keyContext && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">What we know</p>
+                    <p className="text-base text-gray-900 leading-relaxed">
+                      {action.keyContext}
+                    </p>
+                  </div>
+                )}
+
+                {/* Recommendation - Direct */}
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Recommended next step</p>
+                  <p className="text-base text-gray-900 font-medium">
+                    {getRecommendedAction()}
+                  </p>
+                </div>
+
+                {/* Recent History - Minimal */}
+                {action.communicationHistory && action.communicationHistory.length > 1 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">Recent messages</p>
+                    <div className="space-y-3">
+                      {action.communicationHistory.slice(1, 3).map((comm) => (
+                        <div key={comm._id} className="border-l-2 border-gray-200 pl-3">
+                          <p className="text-xs text-gray-500 mb-1">
+                            {formatDistanceToNow(new Date(comm.createdAt), { addSuffix: true })}
+                          </p>
+                          <p className="text-sm text-gray-700 line-clamp-2">
+                            {comm.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Simple Actions */}
+              <div className="p-6 space-y-2">
+                <button
+                  onClick={() => setViewState('reply')}
+                  className="w-full py-3 bg-[#10292E] text-white font-medium text-center rounded-lg hover:bg-[#10292E]/90 transition-colors"
+                >
+                  Reply to {action.client?.name?.split(' ')[0]}
+                </button>
+                
+                {action.urgencyLevel === "critical" && (
+                  <button
+                    className="w-full py-3 text-red-600 font-medium text-center hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    Call immediately
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
-      </Card>
+
+        {/* Reply State - Clean composer */}
+        {viewState === 'reply' && (
+          <motion.div
+            key="reply"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            transition={{ duration: 0.3 }}
+            className="h-full flex flex-col"
+          >
+            <div className={cn(
+              "flex-1 overflow-hidden flex flex-col bg-white",
+              action.urgencyLevel === "critical" && "border-l-4 border-red-500"
+            )}>
+              {/* Minimal Header */}
+              <div className="p-6 pb-4">
+                <button
+                  onClick={() => setViewState('context')}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </button>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  Reply to {action.client?.name?.split(' ')[0]}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Re: {action.communication?.subject || action.title}
+                </p>
+              </div>
+
+              {/* Clean Composer */}
+              <div className="flex-1 px-6 overflow-y-auto">
+                <textarea
+                  placeholder="Type your reply..."
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  className="w-full min-h-[300px] text-base resize-none border-0 outline-none placeholder-gray-400"
+                  autoFocus
+                />
+                
+                {/* Quick Responses - Subtle */}
+                {replyContent.length === 0 && (
+                  <div className="mt-8 space-y-2">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Quick responses</p>
+                    <button
+                      onClick={() => setReplyContent("I'll look into this right away and get back to you shortly.")}
+                      className="block w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 border-l-2 border-gray-200 pl-3 hover:border-gray-400 transition-colors"
+                    >
+                      I'll look into this right away...
+                    </button>
+                    <button
+                      onClick={() => setReplyContent("I understand your concern and will coordinate with the care team immediately.")}
+                      className="block w-full text-left text-sm text-gray-600 hover:text-gray-900 py-2 border-l-2 border-gray-200 pl-3 hover:border-gray-400 transition-colors"
+                    >
+                      I understand your concern...
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Simple Send Button */}
+              <div className="p-6">
+                <button
+                  onClick={handleSendReply}
+                  disabled={!replyContent.trim() || isProcessing}
+                  className={cn(
+                    "w-full py-3 font-medium text-center rounded-lg transition-colors",
+                    replyContent.trim() 
+                      ? "bg-[#87CEEB] text-[#10292E] hover:bg-[#87CEEB]/90" 
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  {isProcessing ? "Sending..." : "Send reply"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Complete State - Optional notes */}
+        {viewState === 'complete' && (
+          <motion.div
+            key="complete"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className="h-full flex flex-col"
+          >
+            <div className="flex-1 overflow-hidden flex flex-col bg-white">
+              {/* Simple Success Message */}
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <Check className="h-5 w-5 text-green-600" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900">Reply sent!</h2>
+                </div>
+
+                {/* Optional Fields - Conversational */}
+                <div className="space-y-6">
+                  {/* Internal Note */}
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Add a note for the team?</p>
+                    <textarea
+                      placeholder="Optional internal note..."
+                      value={internalNote}
+                      onChange={(e) => setInternalNote(e.target.value)}
+                      className="w-full min-h-[80px] p-3 bg-yellow-50 rounded-lg resize-none border-0 outline-none placeholder-gray-400"
+                    />
+                  </div>
+
+                  {/* Time Tracking - Simple */}
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Time spent on this task?</p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={timeSpent}
+                        onChange={(e) => setTimeSpent(e.target.value)}
+                        className="w-20 px-3 py-2 bg-gray-50 rounded-lg border-0 outline-none text-center"
+                        min="0"
+                        step="5"
+                      />
+                      <span className="text-sm text-gray-600">minutes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Simple Actions */}
+              <div className="mt-auto p-6 space-y-3">
+                <button
+                  onClick={handleComplete}
+                  disabled={isProcessing}
+                  className="w-full py-3 bg-[#10292E] text-white font-medium text-center rounded-lg hover:bg-[#10292E]/90 transition-colors"
+                >
+                  {isProcessing ? "Saving..." : "Complete task"}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    onArchive();
+                    toast.success("Task completed!");
+                  }}
+                  className="w-full py-3 text-gray-500 text-center hover:text-gray-700 transition-colors"
+                >
+                  Skip notes and complete
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
